@@ -23,3 +23,6 @@ PhysicalDrive5  0:0:0:3              True  USB   Generic- MS/MS-Pro
 PhysicalDrive6  3:0:0:1     4G True  False VHD   Msft     Virtual Disk     
  L Partition 1              1G             MBR   IFS (HPFS/NTFS)  
 ```
+
+For a similar more native Windows utility see [listdisk](https://github.com/tenox7/listdisk)
+
