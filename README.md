@@ -7,7 +7,7 @@ This is a very early version. Currently lacking support for Volumes, Mount Point
 
 ```
 NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION
-PhysicalDrive0  0:1:0:0  3577G 1  1  0  1  0  SATA    SAMSUNG MZ7LM3T8HCJM-00003 
+PhysicalDrive0  0:1:0:0  3577G 1  1  0  1  0  SATA  SAMSUNG M2345-005 
  L Partition 1              0G                GPT   LDM metadata partition 
  L Partition 2              0G                GPT   Microsoft reserved partition 
  L Partition 3           3577G                GPT   LDM data partition 
