@@ -135,13 +135,20 @@ Routine Description:
     else
         wprintf(L"       ");
 
+    // Status
+    ret=NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DISK_ATTRIBUTES, NULL, 0, &DiskAttributes, sizeof(DiskAttributes));
+    if(ret==0)
+        wprintf(L" %d ", (DiskAttributes.Attributes) ? 0 : 1);
+    else
+        wprintf(L"   ");
+
 
     // Trim
     ret=NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_QUERY_PROPERTY, &trim_q, sizeof(trim_q), &trim_d, sizeof(trim_d));
     if(ret==0)
-        wprintf(L" %-5s", (trim_d.Version == sizeof(DEVICE_TRIM_DESCRIPTOR) && trim_d.TrimEnabled == 1) ? L"True" : L"False");
+        wprintf(L" %d ", (trim_d.Version == sizeof(DEVICE_TRIM_DESCRIPTOR) && trim_d.TrimEnabled == 1) ? 1 : 0);
     else
-        wprintf(L"      ");
+        wprintf(L" 0 ");
 
 
 
@@ -155,11 +162,15 @@ Routine Description:
         if(ret==0)
             if(desc_d->Version == sizeof(STORAGE_DEVICE_DESCRIPTOR)) 
                 wprintf(
-                        L" %-5s"
+                        L" %d "
+                        L" %d "
+                        L" %d "
                         L" %-5s "
                         L"%S "
                         L"%S ",
-                        (desc_d->RemovableMedia<=1)  ? ft[desc_d->RemovableMedia] : L" ",
+                        desc_d->RemovableMedia,
+                        (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_CHECK_VERIFY2, NULL, 0, NULL, 0)==0) ? 1 : 0,
+                        (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_IS_WRITABLE, NULL, 0, NULL, 0) < 0) ? 1 : 0,
                         (desc_d->BusType<=17)        ? bus[desc_d->BusType] : bus[0],
                         (desc_d->VendorIdOffset)     ? (char*)desc_d+desc_d->VendorIdOffset : " ", 
                         (desc_d->ProductIdOffset)    ? (char*)desc_d+desc_d->ProductIdOffset : " "
@@ -172,7 +183,7 @@ Routine Description:
     if(ret==0) {
         for(n=0;n<DiskLayout->PartitionCount;n++)  {
             if(DiskLayout->PartitionEntry[n].PartitionNumber) {
-                wprintf(L" L Partition %d          %5.0fG             %-4s  ", 
+                wprintf(L" L Partition %d          %5.0fG                %-4s  ",
                     DiskLayout->PartitionEntry[n].PartitionNumber,
                     (float)DiskLayout->PartitionEntry[n].PartitionLength.QuadPart/1024/1024/1024,
                     layout[DiskLayout->PartitionEntry[n].PartitionStyle]
@@ -214,7 +225,7 @@ int wmain(int argc, WCHAR **argv) {
 
     wprintf(L"lsblk for Windows v1.0, Copyright (c) 2018 by Antoni Sawicki\n\n");
 
-    wprintf(L"NAME            HCTL      SIZE TRIM  REMOV TYPE  DESCRIPTION\n");
+    wprintf(L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
     ListDisk();
 
