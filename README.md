@@ -25,5 +25,7 @@ PhysicalDrive6  3:0:0:1     4G 0  1  0  1  1  VHD   Msft     Virtual Disk
  L Partition 1              1G                MBR   IFS (HPFS/NTFS)  
 ```
 
+Download under [releases](https://github.com/tenox7/lsblk/releases)
+
 For a similar more native Windows utility see [listdisk](https://github.com/tenox7/listdisk)
 
