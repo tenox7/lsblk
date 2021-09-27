@@ -2,11 +2,11 @@
 
 A utility similar to Linux *lsblk* for Windows. This is not a port of the Linux lsblk source code but rather a completely new utility with just similar output.
 
-This is a very early version. Currently lacking support for Volumes, Mount Points and a number of other output fields from the Linux counterpart.
+This is a very early version. Mount points are under works.
 
 
 ```
-NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION
+NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION      MOUNTS(beta!)
 PhysicalDrive0  0:1:0:0  3577G 1  1  0  1  0  SATA  SAMSUNG M2345-005 
  L Partition 1              0G                GPT   LDM metadata partition 
  L Partition 2              0G                GPT   Microsoft reserved partition 
