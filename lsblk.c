@@ -60,7 +60,7 @@ Routine Description:
     HANDLE hDir;
     OBJECT_ATTRIBUTES attr = { 0 };
     UNICODE_STRING root = { 0 };
-    OBJECT_DIRECTORY_INFORMATION dirinfo[1000] = { 0 };
+    POBJECT_DIRECTORY_INFORMATION dirinfo;
     ULONG i = 0, index = 0, bytes = 0, istart = 0, first = 0;
     NTSTATUS ret;
 
@@ -72,10 +72,11 @@ Routine Description:
         return;
 
     if (debug) wprintf(L"Disks:\n");
+    dirinfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJECT_DIRECTORY_INFORMATION) * 1024);
     first = TRUE;
     istart = 0;
     do {
-        ret = NtQueryDirectoryObject(hDir, &dirinfo, sizeof(dirinfo), FALSE, first, &index, &bytes);
+        ret = NtQueryDirectoryObject(hDir, dirinfo, sizeof(OBJECT_DIRECTORY_INFORMATION) * 1024, FALSE, first, &index, &bytes);
         if (ret < 0)
             break;
 
@@ -92,6 +93,7 @@ Routine Description:
     } while (TRUE);
 
     NtClose(hDir);
+    HeapFree(GetProcessHeap(), 0, dirinfo);
 }
 
 
@@ -113,7 +115,7 @@ Routine Description:
     HANDLE hDisk;
     GET_LENGTH_INFORMATION  DiskLengthInfo;
     GET_DISK_ATTRIBUTES DiskAttributes;
-    DRIVE_LAYOUT_INFORMATION_EX DiskLayout[128];
+    PDRIVE_LAYOUT_INFORMATION_EX DiskLayout;
     SCSI_ADDRESS DiskAddress;
     STORAGE_PROPERTY_QUERY desc_q = { StorageDeviceProperty,  PropertyStandardQuery };
     STORAGE_DESCRIPTOR_HEADER desc_h = { 0 };
@@ -207,9 +209,11 @@ Routine Description:
     );
 
     // Partitions
-    status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, &DiskLayout, sizeof(DiskLayout));
+    DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)*128);
+    status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, DiskLayout, sizeof(PDRIVE_LAYOUT_INFORMATION_EX) * 128);
     if (status != 0) {
         NtClose(hDisk);
+        HeapFree(GetProcessHeap(), 0, DiskLayout);
         wprintf(L"\n");
         return;
     }
@@ -260,11 +264,15 @@ Routine Description:
             if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_BASIC_DATA_ATTRIBUTE_READ_ONLY) == GPT_BASIC_DATA_ATTRIBUTE_READ_ONLY)
                 wprintf(L"[Readonly] ");
         }
+        else {
+            wprintf(L"RAW");
+        }
 
         wprintf(L"\n");
     }
 
     NtClose(hDisk);
+    HeapFree(GetProcessHeap(), 0, DiskLayout);
 }
 
 NTSTATUS GetVolumeMounts(WCHAR* name, PMOUNTS Mounts) {
@@ -284,7 +292,6 @@ NTSTATUS GetVolumeMounts(WCHAR* name, PMOUNTS Mounts) {
     if (len < 2)
         return 1;
 
-    ZeroMemory(Mounts->MntPaths, sizeof(Mounts->MntPaths));
     if (debug) wprintf(L"\n* %s\n Mounts: \n", name);
 
     for (next = buff; next[0] != L'\0'; next += wcslen(next) + 1) {
@@ -293,7 +300,6 @@ NTSTATUS GetVolumeMounts(WCHAR* name, PMOUNTS Mounts) {
     }
     if (debug) wprintf(L"\n");
 
-    ZeroMemory(buff, sizeof(buff));
     _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"\\GLOBAL??%s", name + 3);
     buff[wcslen(buff) - 1] = L'\0';
     if (debug) wprintf(L" %s\n", buff);
@@ -392,6 +398,5 @@ int wmain(int argc, WCHAR** argv) {
     L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
     ListDisk(&Mounts, mnts);
-    getchar();
     return 0;
 }
