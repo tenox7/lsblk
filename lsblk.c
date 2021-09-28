@@ -32,13 +32,13 @@ typedef struct _OBJECT_DIRECTORY_INFORMATION {
     UNICODE_STRING TypeName;
 } OBJECT_DIRECTORY_INFORMATION, * POBJECT_DIRECTORY_INFORMATION;
 
-typedef struct _MOUNTS {
+typedef struct _VOLINFO {
     WCHAR    DiskName[256];
     LONGLONG Start;
     LONGLONG Length;
     WCHAR    MntPaths[1024];
     WCHAR    FsType[MAX_PATH + 1];
-} MOUNTS, * PMOUNTS;
+} VOLINFO, * PVOLINFO;
 
 WCHAR* ft[] = { L"False", L"True" };
 WCHAR* bus[] = { L"UNKNOWN", L"SCSI", L"ATAPI", L"ATA", L"1394", L"SSA", L"FC", L"USB", L"RAID", L"ISCSI", L"SAS", L"SATA", L"SD", L"MMC", L"VIRTUAL", L"VHD", L"MAX", L"NVME" };
@@ -46,13 +46,13 @@ WCHAR* layout[] = { L"MBR", L"GPT", L"RAW" };
 char* MBRTypes[] = { "Unused", "FAT12", "XENIX root", "XENIX /usr", "FAT16 < 32 MiB", "Extended", "FAT16", "IFS (HPFS/NTFS)", "AIX boot, OS/2, Commodore DOS", "AIX data, Coherent, QNX", "Coherent swap, OPUS, OS/2 Boot Manager", "FAT32", "FAT32 (LBA)", "Unknown", "FAT16 (LBA)", "Extended (LBA)", "OPUS", "Hidden FAT12", "Compaq diagnostics, recovery partition", "Unknown", "Hidden FAT16 < 32 MiB, AST-DOS", "Unknown", "Hidden FAT16", "Hidden IFS (HPFS/NTFS)", "AST-Windows swap", "Willowtech Photon coS", "Unknown", "Hidden FAT32", "Hidden FAT32 (LBA)", "Unknown", "Hidden FAT16 (LBA)", "Unknown", "Willowsoft Overture File System", "Oxygen FSo2", "Oxygen Extended ", "SpeedStor reserved", "NEC-DOS", "Unknown", "SpeedStor reserved", "Hidden NTFS", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "SpeedStor reserved", "Unknown", "SpeedStor reserved", "SpeedStor reserved", "Unknown", "SpeedStor reserved", "Unknown", "Theos", "Plan 9", "Unknown", "Unknown", "Partition Magic", "Hidden NetWare", "Unknown", "Unknown", "VENIX 80286", "PReP Boot", "Secure File System", "PTS-DOS", "Unknown", "Priam, EUMEL/Elan", "EUMEL/Elan", "EUMEL/Elan", "EUMEL/Elan", "Unknown", "ALFS/THIN lightweight filesystem for DOS", "Unknown", "Unknown", "QNX 4", "QNX 4", "QNX 4, Oberon", "Ontrack DM, R/O, FAT", "Ontrack DM, R/W, FAT", "CP/M, Microport UNIX", "Ontrack DM 6", "Ontrack DM 6", "EZ-Drive", "Golden Bow VFeature", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Priam EDISK", "Unknown", "Unknown", "Unknown", "Unknown", "SpeedStor", "Unknown", "GNU Hurd, System V, 386/ix", "NetWare 286", "NetWare", "NetWare 386", "NetWare", "NetWare", "NetWare NSS", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "DiskSecure Multi-Boot", "Unknown", "UNIX 7th Edition", "Unknown", "Unknown", "IBM PC/IX", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Old MINIX", "MINIX, Old Linux", "Linux swap, Solaris", "Linux", "Hidden by OS/2, APM hibernation", "Linux extended", "NT Stripe Set", "NT Stripe Set", "Linux Plaintext", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Linux LVM", "Unknown", "Unknown", "Unknown", "Unknown", "Amoeba, Hidden Linux", "Amoeba bad blocks", "Unknown", "Unknown", "Unknown", "Unknown", "Mylex EISA SCSI", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "BSD/OS", "Hibernation", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "HP Volume Expansion", "FreeBSD", "OpenBSD", "NeXTStep", "Apple UFS", "NetBSD", "Olivetti DOS FAT12", "Apple Boot", "Unknown", "Unknown", "Unknown", "Apple HFS", "BootStar", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "BSDi", "BSDi swap", "Unknown", "Unknown", "PTS BootWizard", "Unknown", "Unknown", "Solaris boot", "Solaris", "Novell DOS, DR-DOS secured", "DR-DOS secured FAT12", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS secured FAT16 < 32 MiB", "Unknown", "DR-DOS secured FAT16", "Syrinx", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS secured FAT32", "DR-DOS secured FAT32 (LBA)", "DR-DOS reserved", "DR-DOS secured FAT16 (LBA)", "DR-DOS secured extended (LBA)", "Multiuser DOS secured FAT12", "Multiuser DOS secured FAT12", "Unknown", "Unknown", "Multiuser DOS secured FAT16 < 32 MiB", "Multiuser DOS secured extended", "Multiuser DOS secured FAT16", "Unknown", "CP/M", "Unknown", "Filesystem-less data", "CP/M, CCP/M, CTOS", "Unknown", "Unknown", "Dell partition", "BootIt EMBRM", "Unknown", "SpeedStor", "DOS read/only", "SpeedStor", "SpeedStor", "Tandy DOS", "SpeedStor", "Unknown", "Unknown", "Unknown", "Unknown", "BeOS", "Unknown", "Spryt*x", "Guid Partition Table", "EFI system partition", "Linux boot", "SpeedStor", "DOS 3.3 secondary, Unisys DOS", "SpeedStor", "SpeedStor", "Prologue", "SpeedStor", "Unknown", "Unknown", "Unknown", "Unknown", "VMWare VMFS", "VMWare VMKCORE", "Linux RAID, FreeDOS", "SpeedStor, LANStep, PS/2 IML", "Xenix bad block" };
 
 
-VOID ListDisks(PMOUNTS*, DWORD);
-VOID QueryDisk(WCHAR*, PMOUNTS*, DWORD);
-DWORD ListVolumes(PMOUNTS*);
-NTSTATUS QueryVolume(WCHAR*, PMOUNTS);
-VOID DumpVolumes(PMOUNTS*, DWORD);
+VOID ListDisks(PVOLINFO*, DWORD);
+VOID QueryDisk(WCHAR*, PVOLINFO*, DWORD);
+DWORD ListVolumes(PVOLINFO*);
+NTSTATUS QueryVolume(WCHAR*, PVOLINFO);
+VOID DumpVolumes(PVOLINFO*, DWORD);
 
-VOID ListDisks(PMOUNTS* Mounts, DWORD mnts) {
+VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
     HANDLE hDir;
     OBJECT_ATTRIBUTES attr = { 0 };
     UNICODE_STRING root = { 0 };
@@ -92,7 +92,7 @@ VOID ListDisks(PMOUNTS* Mounts, DWORD mnts) {
     HeapFree(GetProcessHeap(), 0, dirinfo);
 }
 
-VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
+VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     HANDLE hDisk;
     GET_LENGTH_INFORMATION  DiskLengthInfo;
     GET_DISK_ATTRIBUTES DiskAttributes;
@@ -265,7 +265,7 @@ VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
     HeapFree(GetProcessHeap(), 0, DiskLayout);
 }
 
-DWORD ListVolumes(PMOUNTS* Mounts) {
+DWORD ListVolumes(PVOLINFO* Mounts) {
     WCHAR VolName[1024] = { 0 };
     HANDLE find;
     DWORD n = 1;
@@ -276,7 +276,7 @@ DWORD ListVolumes(PMOUNTS* Mounts) {
         return 0;
     }
 
-    *Mounts = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MOUNTS));
+    *Mounts = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(VOLINFO));
     if (*Mounts == NULL) {
         wprintf(L"Unable to allocate memory\n");
         return 0;
@@ -291,7 +291,7 @@ DWORD ListVolumes(PMOUNTS* Mounts) {
         if(debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsType, (*Mounts)[n - 1].MntPaths);
 
         n++;
-        *Mounts = (PMOUNTS)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n*sizeof(MOUNTS));
+        *Mounts = (PVOLINFO)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n*sizeof(VOLINFO));
         if (*Mounts == NULL) {
             wprintf(L"Unable to reallocate memory\n");
             return n - 1;
@@ -301,7 +301,7 @@ DWORD ListVolumes(PMOUNTS* Mounts) {
     return n - 1;
 }
 
-NTSTATUS QueryVolume(WCHAR* name, PMOUNTS Mounts) {
+NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
     WCHAR buff[1024] = { 0 };
     DWORD len, n;
     PWCHAR next;
@@ -369,7 +369,7 @@ NTSTATUS QueryVolume(WCHAR* name, PMOUNTS Mounts) {
     return 0;
 }
 
-VOID DumpVolumes(PMOUNTS *Mounts, DWORD mnts) {
+VOID DumpVolumes(PVOLINFO *Mounts, DWORD mnts) {
     DWORD n;
     wprintf(L"\nMounts:\n\n");
     for (n = 0; n < mnts; n++) {
@@ -386,15 +386,15 @@ VOID DumpVolumes(PMOUNTS *Mounts, DWORD mnts) {
 }
 
 int wmain(int argc, WCHAR** argv) {
-    PMOUNTS Mounts;
-    DWORD mnts=0;
+    PVOLINFO Vols;
+    DWORD nvol=0;
     // TODO: only do this if argv != -n
-    mnts=ListVolumes(&Mounts);
-    if(debug) DumpVolumes(&Mounts, mnts);
+    nvol=ListVolumes(&Vols);
+    if(debug) DumpVolumes(&Vols, nvol);
 
     wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n"
     L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
-    ListDisks(&Mounts, mnts);
+    ListDisks(&Vols, nvol);
     return 0;
 }
