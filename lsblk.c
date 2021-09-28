@@ -112,7 +112,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     NTSTATUS status;
     int i, n, p;
 
-    _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"\\??\\%s", name);
+    swprintf(buff, sizeof(buff) / sizeof(WCHAR), L"\\??\\%s", name);
     RtlInitUnicodeString(&diskname, buff);
     InitializeObjectAttributes(&attr, &diskname, 0, NULL, NULL);
 
@@ -173,7 +173,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
         wprintf(L"\n");
         return;
     }
-    _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"%S %S",
+    swprintf(buff, sizeof(buff) / sizeof(WCHAR), L"%S %S",
         (desc_d->VendorIdOffset) ? (char*)desc_d + desc_d->VendorIdOffset : "",
         (desc_d->ProductIdOffset) ? (char*)desc_d + desc_d->ProductIdOffset : "" // TODO: trim product id
     );
@@ -318,7 +318,7 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
     GetVolumeInformationW(name, NULL, 0, NULL, NULL, NULL, Mounts->FsType, sizeof(Mounts->FsType) / sizeof(WCHAR));
 
     // Extents
-    _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"\\GLOBAL??%s", name + 3);
+    swprintf(buff, sizeof(buff) / sizeof(WCHAR), L"\\GLOBAL??%s", name + 3);
     buff[wcslen(buff) - 1] = L'\0';
     if (debug) wprintf(L" %s\n", buff);
     RtlInitUnicodeString(&volname, buff);
@@ -347,7 +347,7 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
         volext.Extents[0].ExtentLength.QuadPart
     );
 
-    _snwprintf_s(Mounts->DiskName, sizeof(Mounts->DiskName) / sizeof(WCHAR), sizeof(Mounts->DiskName), L"PhysicalDrive%d", volext.Extents[0].DiskNumber);
+    swprintf(Mounts->DiskName, sizeof(Mounts->DiskName) / sizeof(WCHAR), L"PhysicalDrive%d", volext.Extents[0].DiskNumber);
     Mounts->Start = volext.Extents[0].StartingOffset.QuadPart;
     Mounts->Length = volext.Extents[0].ExtentLength.QuadPart;
 
@@ -362,7 +362,7 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
 
     for (next = buff; next[0] != L'\0'; next += wcslen(next) + 1) {
         if (debug) wprintf(L" - %s ", next);
-        _snwprintf_s(Mounts->MntPaths, sizeof(Mounts->MntPaths) / sizeof(WCHAR), sizeof(Mounts->MntPaths), L"%s%s ", Mounts->MntPaths, next);
+        swprintf(Mounts->MntPaths, sizeof(Mounts->MntPaths) / sizeof(WCHAR), L"%s%s ", Mounts->MntPaths, next);
     }
     if (debug) wprintf(L"\n");
 
