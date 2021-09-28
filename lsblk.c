@@ -1,5 +1,6 @@
 //
-// List and Query Physical Disk and Partition Properties on Windows NT based systes
+// lsblk for Windows
+//
 // Copyright (c) 2016-2018 by Antoni Sawicki
 // Copyright (c) 2021 by Google LLC
 //
@@ -30,7 +31,7 @@ typedef struct _MOUNTS {
     LONGLONG Start;
     LONGLONG Length;
     WCHAR    MntPaths[1024];
-    WCHAR    FsName[MAX_PATH + 1];
+    WCHAR    FsType[MAX_PATH + 1];
 } MOUNTS, * PMOUNTS;
 
 WCHAR* ft[] = { L"False", L"True" };
@@ -45,19 +46,7 @@ DWORD GetVolumes(PMOUNTS*);
 NTSTATUS GetVolumeInfo(WCHAR*, PMOUNTS);
 VOID PrintMounts(PMOUNTS*, DWORD);
 
-VOID
-ListDisk(
-    PMOUNTS* Mounts,
-    DWORD mnts
-)
-/*++
-
-Routine Description:
-
-    List Physical Disks in Windows NT System by querying NT Namespace for PhysicalDrive* object
-
---*/
-{
+VOID ListDisk(PMOUNTS* Mounts, DWORD mnts) {
     HANDLE hDir;
     OBJECT_ATTRIBUTES attr = { 0 };
     UNICODE_STRING root = { 0 };
@@ -98,21 +87,7 @@ Routine Description:
 }
 
 
-VOID
-QueryDisk(
-    WCHAR* name,
-    PMOUNTS* Mounts,
-    DWORD mnts
-)
-/*++
-
-Routine Description:
-
-    Query Physical Disk for Properties via IOCTL
-    Input: (WCHAR*) "PhysicalDiskXX"
-
---*/
-{
+VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
     HANDLE hDisk;
     GET_LENGTH_INFORMATION  DiskLengthInfo;
     GET_DISK_ATTRIBUTES DiskAttributes;
@@ -235,7 +210,7 @@ Routine Description:
             ) {
                 //wprintf(L"%s", (*Mounts)[p].MntPaths);
                 mnt = (*Mounts)[p].MntPaths;
-                fst = (*Mounts)[p].FsName;
+                fst = (*Mounts)[p].FsType;
                 break;
             }
         }
@@ -297,7 +272,7 @@ NTSTATUS GetVolumeInfo(WCHAR* name, PMOUNTS Mounts) {
     if (debug) (L"\n* %s\n", name);
 
     // Filesystem Type
-    GetVolumeInformationW(name, buff, sizeof(buff) / sizeof(WCHAR), NULL, NULL, NULL, Mounts->FsName, sizeof(Mounts->FsName) / sizeof(WCHAR));
+    GetVolumeInformationW(name, buff, sizeof(buff) / sizeof(WCHAR), NULL, NULL, NULL, Mounts->FsType, sizeof(Mounts->FsType) / sizeof(WCHAR));
 
     // Extents
     _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"\\GLOBAL??%s", name + 3);
@@ -374,7 +349,7 @@ DWORD GetVolumes(PMOUNTS* Mounts) {
         if (GetVolumeInfo(VolName, &(*Mounts)[n - 1]) != 0)
             continue;
 
-        if(debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsName, (*Mounts)[n - 1].MntPaths);
+        if(debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsType, (*Mounts)[n - 1].MntPaths);
 
         n++;
         *Mounts = (PMOUNTS)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n*sizeof(MOUNTS));
@@ -396,7 +371,7 @@ VOID PrintMounts(PMOUNTS *Mounts, DWORD mnts) {
             (*Mounts)[n].DiskName,
             (*Mounts)[n].Start,
             (*Mounts)[n].Length,
-            (*Mounts)[n].FsName,
+            (*Mounts)[n].FsType,
             (*Mounts)[n].MntPaths
         );
     }
