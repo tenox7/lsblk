@@ -41,8 +41,8 @@ char* MBRTypes[] = { "Unused", "FAT12", "XENIX root", "XENIX /usr", "FAT16 < 32 
 
 VOID ListDisk(PMOUNTS*, DWORD);
 VOID QueryDisk(WCHAR*, PMOUNTS*, DWORD);
-DWORD GetMounts(PMOUNTS*);
-NTSTATUS GetVolumeMounts(WCHAR*, PMOUNTS);
+DWORD GetVolumes(PMOUNTS*);
+NTSTATUS GetVolumeInfo(WCHAR*, PMOUNTS);
 VOID PrintMounts(PMOUNTS*, DWORD);
 
 VOID
@@ -140,7 +140,7 @@ Routine Description:
 
     status = NtOpenFile(&hDisk, GENERIC_READ | SYNCHRONIZE, &attr, &iosb, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT);
     if (status != 0) {
-        wprintf(L"Error: Unable to open %s, NTSTATUS=0x%08X\n\n", diskname.Buffer, status);
+        wprintf(L"Error: Unable to open %s, NTSTATUS=0x%08X\n\n", diskname.Buffer, status); // TODO: add real error printing
         return;
     }
 
@@ -213,6 +213,7 @@ Routine Description:
     // Partitions
     DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)*128);
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, DiskLayout, sizeof(PDRIVE_LAYOUT_INFORMATION_EX) * 128);
+    // TODO: fails on MBR extended partition
     if (status != 0) {
         NtClose(hDisk);
         HeapFree(GetProcessHeap(), 0, DiskLayout);
@@ -244,13 +245,16 @@ Routine Description:
             (float)DiskLayout->PartitionEntry[n].PartitionLength.QuadPart / 1024 / 1024 / 1024,
             layout[DiskLayout->PartitionEntry[n].PartitionStyle]
         );
+
         if (fst && wcslen(fst))
             wprintf(L"%s ", fst);
+
         if (DiskLayout->PartitionEntry[n].PartitionStyle == PARTITION_STYLE_MBR) {
             if(mnt!= NULL && wcslen(mnt) >2)
                 wprintf(L"%s", mnt);
             else
                 wprintf(L"%S ", MBRTypes[DiskLayout->PartitionEntry[n].Mbr.PartitionType]);
+
             wprintf(L"%s", (DiskLayout->PartitionEntry[n].Mbr.BootIndicator) ? L" [Active]" : L" ");
         }
         else if (DiskLayout->PartitionEntry[n].PartitionStyle == PARTITION_STYLE_GPT) {
@@ -258,7 +262,6 @@ Routine Description:
                 wprintf(L"%s", mnt);
             else
                 wprintf(L"%s ", DiskLayout->PartitionEntry[n].Gpt.Name);
-
 
             if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_ATTRIBUTE_PLATFORM_REQUIRED) == GPT_ATTRIBUTE_PLATFORM_REQUIRED)
                 wprintf(L"[Required] ");
@@ -280,7 +283,7 @@ Routine Description:
     HeapFree(GetProcessHeap(), 0, DiskLayout);
 }
 
-NTSTATUS GetVolumeMounts(WCHAR* name, PMOUNTS Mounts) {
+NTSTATUS GetVolumeInfo(WCHAR* name, PMOUNTS Mounts) {
     WCHAR buff[1024] = { 0 };
     DWORD len, n;
     PWCHAR next;
@@ -291,20 +294,12 @@ NTSTATUS GetVolumeMounts(WCHAR* name, PMOUNTS Mounts) {
     HANDLE hVol;
     VOLUME_DISK_EXTENTS volext;
 
-    if (!GetVolumePathNamesForVolumeNameW(name, buff, sizeof(buff)/sizeof(WCHAR), &len))
-        return 1;
+    if (debug) (L"\n* %s\n", name);
 
-    if (len < 2)
-        return 1;
+    // Filesystem Type
+    GetVolumeInformationW(name, buff, sizeof(buff) / sizeof(WCHAR), NULL, NULL, NULL, Mounts->FsName, sizeof(Mounts->FsName) / sizeof(WCHAR));
 
-    if (debug) wprintf(L"\n* %s\n Mounts: \n", name);
-
-    for (next = buff; next[0] != L'\0'; next += wcslen(next) + 1) {
-        if (debug) wprintf(L" - %s ", next);
-        _snwprintf_s(Mounts->MntPaths, sizeof(Mounts->MntPaths) / sizeof(WCHAR), sizeof(Mounts->MntPaths), L"%s%s ", Mounts->MntPaths, next);
-    }
-    if (debug) wprintf(L"\n");
-
+    // Extents
     _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"\\GLOBAL??%s", name + 3);
     buff[wcslen(buff) - 1] = L'\0';
     if (debug) wprintf(L" %s\n", buff);
@@ -338,13 +333,25 @@ NTSTATUS GetVolumeMounts(WCHAR* name, PMOUNTS Mounts) {
     Mounts->Start = volext.Extents[0].StartingOffset.QuadPart;
     Mounts->Length = volext.Extents[0].ExtentLength.QuadPart;
 
-    // TODO: is it possible to get filesystem type without having any mounts? if so move to top before GetVolumePathNamesForVolumeName
-    GetVolumeInformationW(name, buff, sizeof(buff) / sizeof(WCHAR), NULL, NULL, NULL, Mounts->FsName, sizeof(Mounts->FsName)/sizeof(WCHAR));
+    // Mount points
+    if (!GetVolumePathNamesForVolumeNameW(name, buff, sizeof(buff) / sizeof(WCHAR), &len))
+        return 0;
+
+    if (len < 2)
+        return 0;
+
+    if (debug) wprintf(L"Mounts: \n");
+
+    for (next = buff; next[0] != L'\0'; next += wcslen(next) + 1) {
+        if (debug) wprintf(L" - %s ", next);
+        _snwprintf_s(Mounts->MntPaths, sizeof(Mounts->MntPaths) / sizeof(WCHAR), sizeof(Mounts->MntPaths), L"%s%s ", Mounts->MntPaths, next);
+    }
+    if (debug) wprintf(L"\n");
 
     return 0;
 }
 
-DWORD GetMounts(PMOUNTS* Mounts) {
+DWORD GetVolumes(PMOUNTS* Mounts) {
     WCHAR VolName[1024] = { 0 };
     HANDLE find;
     DWORD n = 1;
@@ -364,7 +371,7 @@ DWORD GetMounts(PMOUNTS* Mounts) {
     if (debug) wprintf(L"Volumes:\n");
 
     do {
-        if (GetVolumeMounts(VolName, &(*Mounts)[n - 1]) != 0)
+        if (GetVolumeInfo(VolName, &(*Mounts)[n - 1]) != 0)
             continue;
 
         if(debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsName, (*Mounts)[n - 1].MntPaths);
@@ -400,7 +407,7 @@ int wmain(int argc, WCHAR** argv) {
     PMOUNTS Mounts;
     DWORD mnts=0;
 
-    mnts=GetMounts(&Mounts);
+    mnts=GetVolumes(&Mounts);
     if(debug) PrintMounts(&Mounts, mnts);
 
     wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n"
