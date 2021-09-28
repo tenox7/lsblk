@@ -123,6 +123,7 @@ Routine Description:
     OBJECT_ATTRIBUTES attr = { 0 };
     UNICODE_STRING diskname = { 0 };
     WCHAR diskname_s[1024] = { 0 };
+    PWCHAR mnt = NULL;
     IO_STATUS_BLOCK iosb;
     NTSTATUS status;
     int i, n, p;
@@ -199,7 +200,7 @@ Routine Description:
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_CHECK_VERIFY2, NULL, 0, NULL, 0) == 0) ? 1 : 0,
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_IS_WRITABLE, NULL, 0, NULL, 0) < 0) ? 1 : 0,
         (desc_d->BusType <= 17) ? bus[desc_d->BusType] : bus[0],
-        (desc_d->VendorIdOffset) ? (char*)desc_d + desc_d->VendorIdOffset : " ",
+        (desc_d->VendorIdOffset) ? (char*)desc_d + desc_d->VendorIdOffset : " ", // https://docs.microsoft.com/en-us/windows/win32/api/shlwapi/nf-shlwapi-strtrimw StrTrim it!
         (desc_d->ProductIdOffset) ? (char*)desc_d + desc_d->ProductIdOffset : " "
     );
 
@@ -215,21 +216,38 @@ Routine Description:
         if (!DiskLayout->PartitionEntry[n].PartitionNumber)
             continue;
 
+        // Mount Points
+        for (p = 0; p < mnts; p++) {
+            if (debug) wprintf(L"\n>>> %d: %s==%s %lld==%lld %lld=%lld\n", p, (*Mounts)[p].DiskName, name, (*Mounts)[p].Start, DiskLayout->PartitionEntry[n].StartingOffset.QuadPart, (*Mounts)[p].Length, DiskLayout->PartitionEntry[n].PartitionLength.QuadPart);
+            mnt = NULL;
+            if (wcscmp((*Mounts)[p].DiskName, name) == 0 &&
+                (*Mounts)[p].Start == DiskLayout->PartitionEntry[n].StartingOffset.QuadPart &&
+                (*Mounts)[p].Length == DiskLayout->PartitionEntry[n].PartitionLength.QuadPart
+            ) {
+                //wprintf(L"%s", (*Mounts)[p].MntPaths);
+                mnt = (*Mounts)[p].MntPaths;
+                break;
+            }
+        }
+
         wprintf(L" L Partition %d          %5.0fG                %-4s  ",
             DiskLayout->PartitionEntry[n].PartitionNumber,
             (float)DiskLayout->PartitionEntry[n].PartitionLength.QuadPart / 1024 / 1024 / 1024,
             layout[DiskLayout->PartitionEntry[n].PartitionStyle]
         );
         if (DiskLayout->PartitionEntry[n].PartitionStyle == PARTITION_STYLE_MBR) {
-            wprintf(L"%S %s",
-                MBRTypes[DiskLayout->PartitionEntry[n].Mbr.PartitionType],
-                (DiskLayout->PartitionEntry[n].Mbr.BootIndicator) ? L"[Active]" : L" "
-            );
+            if(mnt!= NULL && wcslen(mnt) >2)
+                wprintf(L"%s", mnt);
+            else
+                wprintf(L"%S ", MBRTypes[DiskLayout->PartitionEntry[n].Mbr.PartitionType]);
+            wprintf(L"%s", (DiskLayout->PartitionEntry[n].Mbr.BootIndicator) ? L" [Active]" : L" ");
         }
         else if (DiskLayout->PartitionEntry[n].PartitionStyle == PARTITION_STYLE_GPT) {
-            wprintf(L"%s ",
-                DiskLayout->PartitionEntry[n].Gpt.Name
-            );
+            if (mnt != NULL && wcslen(mnt) > 2)
+                wprintf(L"%s", mnt);
+            else
+                wprintf(L"%s ", DiskLayout->PartitionEntry[n].Gpt.Name);
+
 
             if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_ATTRIBUTE_PLATFORM_REQUIRED) == GPT_ATTRIBUTE_PLATFORM_REQUIRED)
                 wprintf(L"[Required] ");
@@ -241,24 +259,6 @@ Routine Description:
                 wprintf(L"[Readonly] ");
         }
 
-        // Mount Points
-        for (p = 0; p < mnts; p++) {
-            if(debug) wprintf(L"\n>>> %d: %s==%s %lld==%lld %lld=%lld\n",
-                p,
-                (*Mounts)[p].DiskName,
-                name,
-                (*Mounts)[p].Start,
-                DiskLayout->PartitionEntry[n].StartingOffset.QuadPart,
-                (*Mounts)[p].Length,
-                DiskLayout->PartitionEntry[n].PartitionLength.QuadPart
-            );
-            if (wcscmp((*Mounts)[p].DiskName, name)==0 &&
-                (*Mounts)[p].Start == DiskLayout->PartitionEntry[n].StartingOffset.QuadPart &&
-                (*Mounts)[p].Length == DiskLayout->PartitionEntry[n].PartitionLength.QuadPart
-            ) {
-                wprintf(L"%s", (*Mounts)[p].MntPaths);
-            }
-        }
         wprintf(L"\n");
     }
 
@@ -287,7 +287,7 @@ NTSTATUS GetVolumeMounts(WCHAR* name, PMOUNTS Mounts) {
 
     for (next = buff; next[0] != L'\0'; next += wcslen(next) + 1) {
         if (debug) wprintf(L" - %s ", next);
-        _snwprintf_s(Mounts->MntPaths, sizeof(Mounts->MntPaths) / sizeof(WCHAR), sizeof(Mounts->MntPaths), L"%s %s", Mounts->MntPaths, next);
+        _snwprintf_s(Mounts->MntPaths, sizeof(Mounts->MntPaths) / sizeof(WCHAR), sizeof(Mounts->MntPaths), L"%s%s ", Mounts->MntPaths, next);
     }
     if (debug) wprintf(L"\n");
 
@@ -380,14 +380,16 @@ VOID PrintMounts(PMOUNTS *Mounts, DWORD mnts) {
 }
 int wmain(int argc, WCHAR** argv) {
     PMOUNTS Mounts;
-    DWORD mnts;
+    DWORD mnts=0;
 
     mnts=GetMounts(&Mounts);
     if(debug) PrintMounts(&Mounts, mnts);
 
-    wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n");
-    wprintf(L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION    MOUNTS(beta)\n");
-    ListDisk(&Mounts, mnts);
+    wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n"
+    L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
+    ListDisk(&Mounts, mnts);
+    getchar();
     return 0;
 }
+
