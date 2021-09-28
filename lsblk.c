@@ -14,7 +14,7 @@
 #include <diskguid.h>
 
 #pragma comment(lib, "ntdll.lib")
-#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "shlwapi.lib")
 
 DWORD debug = 0;
 
@@ -122,14 +122,14 @@ Routine Description:
     DEVICE_TRIM_DESCRIPTOR trim_d = { 0 };
     OBJECT_ATTRIBUTES attr = { 0 };
     UNICODE_STRING diskname = { 0 };
-    WCHAR diskname_s[1024] = { 0 };
+    WCHAR buff[1024] = { 0 };
     PWCHAR mnt = NULL;
     IO_STATUS_BLOCK iosb;
     NTSTATUS status;
     int i, n, p;
 
-    _snwprintf_s(diskname_s, sizeof(diskname_s) / sizeof(WCHAR), sizeof(diskname_s), L"\\??\\%s", name);
-    RtlInitUnicodeString(&diskname, diskname_s);
+    _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"\\??\\%s", name);
+    RtlInitUnicodeString(&diskname, buff);
     InitializeObjectAttributes(&attr, &diskname, 0, NULL, NULL);
 
     wprintf(L"%-15s", name);
@@ -188,20 +188,22 @@ Routine Description:
         wprintf(L"\n");
         return;
     }
-
+    _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"%S %S",
+        (desc_d->VendorIdOffset) ? (char*)desc_d + desc_d->VendorIdOffset : "",
+        (desc_d->ProductIdOffset) ? (char*)desc_d + desc_d->ProductIdOffset : ""
+    );
+    StrTrimW(buff, L" ");
     wprintf(
         L" %d "
         L" %d "
         L" %d "
         L" %-5s "
-        L"%S "
-        L"%S\n",
+        L"%s\n",
         desc_d->RemovableMedia,
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_CHECK_VERIFY2, NULL, 0, NULL, 0) == 0) ? 1 : 0,
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_IS_WRITABLE, NULL, 0, NULL, 0) < 0) ? 1 : 0,
-        (desc_d->BusType <= 17) ? bus[desc_d->BusType] : bus[0],
-        (desc_d->VendorIdOffset) ? (char*)desc_d + desc_d->VendorIdOffset : " ", // https://docs.microsoft.com/en-us/windows/win32/api/shlwapi/nf-shlwapi-strtrimw StrTrim it!
-        (desc_d->ProductIdOffset) ? (char*)desc_d + desc_d->ProductIdOffset : " "
+        (desc_d->BusType <= (sizeof(bus) / sizeof(bus[0])-1)) ? bus[desc_d->BusType] : bus[0],
+        buff
     );
 
     // Partitions
@@ -360,6 +362,7 @@ DWORD GetMounts(PMOUNTS* Mounts) {
             return n - 1;
         }
     } while (FindNextVolumeW(find, VolName, sizeof(VolName)/sizeof(WCHAR)));
+
     return n - 1;
 }
 
@@ -376,8 +379,8 @@ VOID PrintMounts(PMOUNTS *Mounts, DWORD mnts) {
         );
     }
     return;
-
 }
+
 int wmain(int argc, WCHAR** argv) {
     PMOUNTS Mounts;
     DWORD mnts=0;
@@ -392,4 +395,3 @@ int wmain(int argc, WCHAR** argv) {
     getchar();
     return 0;
 }
-
