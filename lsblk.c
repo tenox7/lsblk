@@ -5,6 +5,13 @@
 // Copyright (c) 2021 by Google LLC
 //
 
+// TODOs:
+// real error reporting
+// fails on extended partitions
+// trim product id string
+// argv=-n to skip volume probing
+// remove extended debug
+
 #include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
@@ -12,7 +19,6 @@
 #include <winternl.h>
 #include <Ntddscsi.h>
 #include <ntdddisk.h>
-#include <diskguid.h>
 
 #pragma comment(lib, "ntdll.lib")
 #pragma comment(lib, "shlwapi.lib")
@@ -139,15 +145,12 @@ VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
     else
         wprintf(L"   ");
 
-
     // Trim
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_QUERY_PROPERTY, &trim_q, sizeof(trim_q), &trim_d, sizeof(trim_d));
     if (status == 0)
         wprintf(L" %d ", (trim_d.Version == sizeof(DEVICE_TRIM_DESCRIPTOR) && trim_d.TrimEnabled == 1) ? 1 : 0);
     else
         wprintf(L" 0 ");
-
-
 
     // Device Property
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_QUERY_PROPERTY, &desc_q, sizeof(desc_q), &desc_h, sizeof(desc_h));
@@ -157,8 +160,12 @@ VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
         return;
     }
 
-    desc_d = malloc(desc_h.Size);
-    ZeroMemory(desc_d, desc_h.Size);
+    desc_d = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, desc_h.Size);
+    if (desc_d == NULL) {
+        NtClose(hDisk);
+        wprintf(L"\n");
+        return;
+    }
 
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_QUERY_PROPERTY, &desc_q, sizeof(desc_q), desc_d, desc_h.Size);
     if (status != 0 || desc_d->Version != sizeof(STORAGE_DEVICE_DESCRIPTOR)) {
@@ -168,7 +175,7 @@ VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
     }
     _snwprintf_s(buff, sizeof(buff) / sizeof(WCHAR), sizeof(buff), L"%S %S",
         (desc_d->VendorIdOffset) ? (char*)desc_d + desc_d->VendorIdOffset : "",
-        (desc_d->ProductIdOffset) ? (char*)desc_d + desc_d->ProductIdOffset : ""
+        (desc_d->ProductIdOffset) ? (char*)desc_d + desc_d->ProductIdOffset : "" // TODO: trim product id
     );
     StrTrimW(buff, L" ");
     wprintf(
@@ -183,6 +190,7 @@ VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
         (desc_d->BusType <= (sizeof(bus) / sizeof(bus[0])-1)) ? bus[desc_d->BusType] : bus[0],
         buff
     );
+    HeapFree(GetProcessHeap(), 0, desc_d);
 
     // Partitions
     DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)*128);
