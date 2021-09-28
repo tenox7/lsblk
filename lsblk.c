@@ -42,9 +42,9 @@ char* MBRTypes[] = { "Unused", "FAT12", "XENIX root", "XENIX /usr", "FAT16 < 32 
 
 VOID ListDisk(PMOUNTS*, DWORD);
 VOID QueryDisk(WCHAR*, PMOUNTS*, DWORD);
-DWORD GetVolumes(PMOUNTS*);
-NTSTATUS GetVolumeInfo(WCHAR*, PMOUNTS);
-VOID PrintMounts(PMOUNTS*, DWORD);
+DWORD ListVolumes(PMOUNTS*);
+NTSTATUS QueryVolume(WCHAR*, PMOUNTS);
+VOID DumpVolumes(PMOUNTS*, DWORD);
 
 VOID ListDisk(PMOUNTS* Mounts, DWORD mnts) {
     HANDLE hDir;
@@ -85,7 +85,6 @@ VOID ListDisk(PMOUNTS* Mounts, DWORD mnts) {
     NtClose(hDir);
     HeapFree(GetProcessHeap(), 0, dirinfo);
 }
-
 
 VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
     HANDLE hDisk;
@@ -258,7 +257,43 @@ VOID QueryDisk(WCHAR* name, PMOUNTS* Mounts, DWORD mnts) {
     HeapFree(GetProcessHeap(), 0, DiskLayout);
 }
 
-NTSTATUS GetVolumeInfo(WCHAR* name, PMOUNTS Mounts) {
+DWORD ListVolumes(PMOUNTS* Mounts) {
+    WCHAR VolName[1024] = { 0 };
+    HANDLE find;
+    DWORD n = 1;
+
+    find = FindFirstVolumeW(VolName, sizeof(VolName)/sizeof(WCHAR));
+    if (find == INVALID_HANDLE_VALUE) {
+        wprintf(L"Error: Unable to list volumes\n");
+        return 0;
+    }
+
+    *Mounts = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MOUNTS));
+    if (*Mounts == NULL) {
+        wprintf(L"Unable to allocate memory\n");
+        return 0;
+    }
+
+    if (debug) wprintf(L"Volumes:\n");
+
+    do {
+        if (QueryVolume(VolName, &(*Mounts)[n - 1]) != 0)
+            continue;
+
+        if(debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsType, (*Mounts)[n - 1].MntPaths);
+
+        n++;
+        *Mounts = (PMOUNTS)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n*sizeof(MOUNTS));
+        if (*Mounts == NULL) {
+            wprintf(L"Unable to reallocate memory\n");
+            return n - 1;
+        }
+    } while (FindNextVolumeW(find, VolName, sizeof(VolName)/sizeof(WCHAR)));
+
+    return n - 1;
+}
+
+NTSTATUS QueryVolume(WCHAR* name, PMOUNTS Mounts) {
     WCHAR buff[1024] = { 0 };
     DWORD len, n;
     PWCHAR next;
@@ -326,43 +361,7 @@ NTSTATUS GetVolumeInfo(WCHAR* name, PMOUNTS Mounts) {
     return 0;
 }
 
-DWORD GetVolumes(PMOUNTS* Mounts) {
-    WCHAR VolName[1024] = { 0 };
-    HANDLE find;
-    DWORD n = 1;
-
-    find = FindFirstVolumeW(VolName, sizeof(VolName)/sizeof(WCHAR));
-    if (find == INVALID_HANDLE_VALUE) {
-        wprintf(L"Error: Unable to list volumes\n");
-        return 0;
-    }
-
-    *Mounts = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MOUNTS));
-    if (*Mounts == NULL) {
-        wprintf(L"Unable to allocate memory\n");
-        return 0;
-    }
-
-    if (debug) wprintf(L"Volumes:\n");
-
-    do {
-        if (GetVolumeInfo(VolName, &(*Mounts)[n - 1]) != 0)
-            continue;
-
-        if(debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsType, (*Mounts)[n - 1].MntPaths);
-
-        n++;
-        *Mounts = (PMOUNTS)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n*sizeof(MOUNTS));
-        if (*Mounts == NULL) {
-            wprintf(L"Unable to reallocate memory\n");
-            return n - 1;
-        }
-    } while (FindNextVolumeW(find, VolName, sizeof(VolName)/sizeof(WCHAR)));
-
-    return n - 1;
-}
-
-VOID PrintMounts(PMOUNTS *Mounts, DWORD mnts) {
+VOID DumpVolumes(PMOUNTS *Mounts, DWORD mnts) {
     DWORD n;
     wprintf(L"\nMounts:\n\n");
     for (n = 0; n < mnts; n++) {
@@ -382,8 +381,8 @@ int wmain(int argc, WCHAR** argv) {
     PMOUNTS Mounts;
     DWORD mnts=0;
 
-    mnts=GetVolumes(&Mounts);
-    if(debug) PrintMounts(&Mounts, mnts);
+    mnts=ListVolumes(&Mounts);
+    if(debug) DumpVolumes(&Mounts, mnts);
 
     wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n"
     L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
