@@ -30,6 +30,7 @@ typedef struct _MOUNTS {
     LONGLONG Start;
     LONGLONG Length;
     WCHAR    MntPaths[1024];
+    WCHAR    FsName[MAX_PATH + 1];
 } MOUNTS, * PMOUNTS;
 
 WCHAR* ft[] = { L"False", L"True" };
@@ -126,6 +127,7 @@ Routine Description:
     UNICODE_STRING diskname = { 0 };
     WCHAR buff[1024] = { 0 };
     PWCHAR mnt = NULL;
+    PWCHAR fst = NULL;
     IO_STATUS_BLOCK iosb;
     NTSTATUS status;
     int i, n, p;
@@ -232,6 +234,7 @@ Routine Description:
             ) {
                 //wprintf(L"%s", (*Mounts)[p].MntPaths);
                 mnt = (*Mounts)[p].MntPaths;
+                fst = (*Mounts)[p].FsName;
                 break;
             }
         }
@@ -241,6 +244,8 @@ Routine Description:
             (float)DiskLayout->PartitionEntry[n].PartitionLength.QuadPart / 1024 / 1024 / 1024,
             layout[DiskLayout->PartitionEntry[n].PartitionStyle]
         );
+        if (fst && wcslen(fst))
+            wprintf(L"%s ", fst);
         if (DiskLayout->PartitionEntry[n].PartitionStyle == PARTITION_STYLE_MBR) {
             if(mnt!= NULL && wcslen(mnt) >2)
                 wprintf(L"%s", mnt);
@@ -333,6 +338,9 @@ NTSTATUS GetVolumeMounts(WCHAR* name, PMOUNTS Mounts) {
     Mounts->Start = volext.Extents[0].StartingOffset.QuadPart;
     Mounts->Length = volext.Extents[0].ExtentLength.QuadPart;
 
+    // TODO: is it possible to get filesystem type without having any mounts? if so move to top before GetVolumePathNamesForVolumeName
+    GetVolumeInformationW(name, buff, sizeof(buff) / sizeof(WCHAR), NULL, NULL, NULL, Mounts->FsName, sizeof(Mounts->FsName)/sizeof(WCHAR));
+
     return 0;
 }
 
@@ -359,7 +367,7 @@ DWORD GetMounts(PMOUNTS* Mounts) {
         if (GetVolumeMounts(VolName, &(*Mounts)[n - 1]) != 0)
             continue;
 
-        if(debug) wprintf(L"n=%d d=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].MntPaths);
+        if(debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsName, (*Mounts)[n - 1].MntPaths);
 
         n++;
         *Mounts = (PMOUNTS)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n*sizeof(MOUNTS));
@@ -376,11 +384,12 @@ VOID PrintMounts(PMOUNTS *Mounts, DWORD mnts) {
     DWORD n;
     wprintf(L"\nMounts:\n\n");
     for (n = 0; n < mnts; n++) {
-        wprintf(L"%d: disk=%s start=%llu len=%llu paths=%s\n",
+        wprintf(L"%d: disk=%s start=%llu len=%llu fs=%s paths=%s\n",
             n,
             (*Mounts)[n].DiskName,
             (*Mounts)[n].Start,
             (*Mounts)[n].Length,
+            (*Mounts)[n].FsName,
             (*Mounts)[n].MntPaths
         );
     }
