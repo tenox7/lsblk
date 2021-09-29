@@ -16,7 +16,7 @@
 #pragma comment(lib, "ntdll.lib")
 #pragma comment(lib, "shlwapi.lib")
 
-DWORD debug = 1;
+DWORD debug = 0;
 
 #define DIRECTORY_QUERY                 (0x0001)
 #define DIRECTORY_TRAVERSE              (0x0002)
@@ -71,7 +71,7 @@ VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
     OBJECT_ATTRIBUTES attr = { 0 };
     UNICODE_STRING root = { 0 };
     POBJECT_DIRECTORY_INFORMATION DirInfo;
-    DWORD nDirInfo = 1024;
+    DWORD nDirInfo = 2048;
     ULONG i = 0, index = 0, bytes = 0, istart = 0, first = 0;
     NTSTATUS status;
 
@@ -422,17 +422,29 @@ VOID DumpVolumes(PVOLINFO *Mounts, DWORD mnts) {
     return;
 }
 
+
+
 int wmain(int argc, WCHAR** argv) {
     PVOLINFO Vols;
     DWORD nvol=0;
+    BOOL getvols = TRUE;
+    int n;
 
-    // TODO: only do this if argv != -n
-    nvol=ListVolumes(&Vols);
+    for (n = 1; n < argc; n++) {
+        if(wcscmp(argv[n], L"-d")==0)
+            debug=1;
+        if(wcscmp(argv[n], L"-n")==0)
+            getvols = FALSE;
+    }
+
+    if(getvols)
+        nvol=ListVolumes(&Vols);
     if(debug) DumpVolumes(&Vols, nvol);
 
     wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n"
     L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
     ListDisks(&Vols, nvol);
+
     return 0;
 }
