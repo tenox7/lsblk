@@ -58,11 +58,11 @@ VOID ErrPt(BOOL exit, WCHAR* msg, ...) {
     putchar(L'\n');
     err = GetLastError();
     if (err) {
-        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buff, sizeof(buff)/sizeof(WCHAR), NULL);
+        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buff, sizeof(buff) / sizeof(WCHAR), NULL);
         wprintf(L"[0x%08X] %s\n", err, buff);
     }
 
-    if(exit)
+    if (exit)
         ExitProcess(1);
 }
 
@@ -84,12 +84,12 @@ VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
 
     if (debug) wprintf(L"Disks:\n");
     DirInfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJECT_DIRECTORY_INFORMATION) * nDirInfo);
-    if (DirInfo==NULL)
+    if (DirInfo == NULL)
         ErrPt(TRUE, L"Unable to allocate memory");
     first = TRUE;
     istart = 0;
     do {
-        moremem:
+    moremem:
         status = NtQueryDirectoryObject(hDir, DirInfo, sizeof(OBJECT_DIRECTORY_INFORMATION) * nDirInfo, FALSE, first, &index, &bytes);
         if (status == 0x00000105) {
             if (debug) wprintf(L"\nNtQueryDirectoryObject needs more memory n=%d\n", nDirInfo);
@@ -122,7 +122,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     GET_LENGTH_INFORMATION  DiskLengthInfo;
     GET_DISK_ATTRIBUTES DiskAttributes;
     PDRIVE_LAYOUT_INFORMATION_EX DiskLayout;
-    WCHAR nDiskLayout=64;
+    WCHAR nDiskLayout = 64;
     SCSI_ADDRESS DiskAddress;
     STORAGE_PROPERTY_QUERY desc_q = { StorageDeviceProperty,  PropertyStandardQuery };
     STORAGE_DESCRIPTOR_HEADER desc_h = { 0 };
@@ -146,7 +146,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
 
     status = NtOpenFile(&hDisk, GENERIC_READ | SYNCHRONIZE, &attr, &iosb, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT);
     if (status != 0) {
-        ErrPt(FALSE, L"Error: Unable to open %s, NTSTATUS=0x%08X\n\n", diskname.Buffer, status);
+        ErrPt(FALSE, L"Unable to open %s, NTSTATUS=0x%08X\n\n", diskname.Buffer, status);
         return;
     }
 
@@ -215,19 +215,19 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
         desc_d->RemovableMedia,
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_CHECK_VERIFY2, NULL, 0, NULL, 0) == 0) ? 1 : 0,
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_IS_WRITABLE, NULL, 0, NULL, 0) < 0) ? 1 : 0,
-        (desc_d->BusType <= (sizeof(bus) / sizeof(bus[0])-1)) ? bus[desc_d->BusType] : bus[0],
+        (desc_d->BusType <= (sizeof(bus) / sizeof(bus[0]) - 1)) ? bus[desc_d->BusType] : bus[0],
         buff
     );
     HeapFree(GetProcessHeap(), 0, desc_d);
 
     // Partitions
-    DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(DRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
-    moremem:
-    status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, DiskLayout, sizeof(DRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
+    DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(DRIVE_LAYOUT_INFORMATION_EX) * nDiskLayout);
+moremem:
+    status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, DiskLayout, sizeof(DRIVE_LAYOUT_INFORMATION_EX) * nDiskLayout);
     if (status == 0xC0000023) {
         if (debug) wprintf(L"\nIOCTL_DISK_GET_DRIVE_LAYOUT_EX needs more memory n=%d\n", nDiskLayout);
         nDiskLayout = nDiskLayout * 2;
-        DiskLayout = (PDRIVE_LAYOUT_INFORMATION_EX)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, DiskLayout, sizeof(DRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
+        DiskLayout = (PDRIVE_LAYOUT_INFORMATION_EX)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, DiskLayout, sizeof(DRIVE_LAYOUT_INFORMATION_EX) * nDiskLayout);
         if (DiskLayout == NULL)
             ErrPt(TRUE, L"Unable to allocate memory for DiskLayout");
         goto moremem;
@@ -246,12 +246,12 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
 
         // Mount Points
         for (p = 0; p < mnts; p++) {
-            if (debug>1) wprintf(L"\n  %d: %s==%s %lld==%lld %lld=%lld\n", p, (*Mounts)[p].DiskName, name, (*Mounts)[p].Start, DiskLayout->PartitionEntry[n].StartingOffset.QuadPart, (*Mounts)[p].Length, DiskLayout->PartitionEntry[n].PartitionLength.QuadPart);
+            if (debug > 1) wprintf(L"\n  %d: %s==%s %lld==%lld %lld=%lld\n", p, (*Mounts)[p].DiskName, name, (*Mounts)[p].Start, DiskLayout->PartitionEntry[n].StartingOffset.QuadPart, (*Mounts)[p].Length, DiskLayout->PartitionEntry[n].PartitionLength.QuadPart);
             mnt = NULL;
             if (wcscmp((*Mounts)[p].DiskName, name) == 0 &&
                 (*Mounts)[p].Start == DiskLayout->PartitionEntry[n].StartingOffset.QuadPart &&
                 (*Mounts)[p].Length == DiskLayout->PartitionEntry[n].PartitionLength.QuadPart
-            ) {
+                ) {
                 //wprintf(L"%s", (*Mounts)[p].MntPaths);
                 mnt = (*Mounts)[p].MntPaths;
                 fst = (*Mounts)[p].FsType;
@@ -269,7 +269,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
             wprintf(L"%s ", fst);
 
         if (DiskLayout->PartitionEntry[n].PartitionStyle == PARTITION_STYLE_MBR) {
-            if(mnt!= NULL && wcslen(mnt) >2)
+            if (mnt != NULL && wcslen(mnt) > 2)
                 wprintf(L"%s", mnt);
             else
                 wprintf(L"%S ", MBRTypes[DiskLayout->PartitionEntry[n].Mbr.PartitionType]);
@@ -307,9 +307,9 @@ DWORD ListVolumes(PVOLINFO* Mounts) {
     HANDLE find;
     DWORD n = 1;
 
-    find = FindFirstVolumeW(VolName, sizeof(VolName)/sizeof(WCHAR));
+    find = FindFirstVolumeW(VolName, sizeof(VolName) / sizeof(WCHAR));
     if (find == INVALID_HANDLE_VALUE) {
-        ErrPt(FALSE, L"Error: Unable to list volumes\n");
+        ErrPt(FALSE, L"Unable to list volumes\n");
         return 0;
     }
 
@@ -325,15 +325,15 @@ DWORD ListVolumes(PVOLINFO* Mounts) {
         if (QueryVolume(VolName, &(*Mounts)[n - 1]) != 0)
             continue;
 
-        if(debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsType, (*Mounts)[n - 1].MntPaths);
+        if (debug) wprintf(L"n=%d d=%s f=%s p=%s\n", n, (*Mounts)[n - 1].DiskName, (*Mounts)[n - 1].FsType, (*Mounts)[n - 1].MntPaths);
 
         n++;
-        *Mounts = (PVOLINFO)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n*sizeof(VOLINFO));
+        *Mounts = (PVOLINFO)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n * sizeof(VOLINFO));
         if (*Mounts == NULL) {
             ErrPt(FALSE, L"Unable to reallocate memory\n");
             return n - 1;
         }
-    } while (FindNextVolumeW(find, VolName, sizeof(VolName)/sizeof(WCHAR)));
+    } while (FindNextVolumeW(find, VolName, sizeof(VolName) / sizeof(WCHAR)));
 
     return n - 1;
 }
@@ -363,19 +363,20 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
 
     status = NtOpenFile(&hVol, SYNCHRONIZE, &attr, &iosb, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT);
     if (status != 0) {
-        if (debug) ErrPt(FALSE, L"Error: Unable to open %s, NTSTATUS=0x%08X\n\n", volname.Buffer, status);
+        if (debug) ErrPt(FALSE, L"Unable to open %s, NTSTATUS=0x%08X\n\n", volname.Buffer, status);
         return 1;
     }
 
-    status = NtDeviceIoControlFile(hVol, NULL, NULL, NULL, &iosb, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, NULL, 0, &volext, sizeof(volext));
+    // TODO: add support for dynamic disks
+    status = NtDeviceIoControlFile(hVol, NULL, NULL, NULL, &iosb, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, NULL, 0, &volext, sizeof(VOLUME_DISK_EXTENTS));
     if (status != 0) {
-        if (debug) ErrPt(FALSE, L" Error: Unable to get volume extents, NTSTATUS=0x%08X\n\n", status);
+        if (debug) ErrPt(FALSE, L"Unable to get volume extents, NTSTATUS=0x%08X\n\n", status);
         NtClose(hVol);
         return 1;
     }
     NtClose(hVol);
 
-    if (volext.NumberOfDiskExtents != 1) // only support simple volumes
+    if (volext.NumberOfDiskExtents < 1)
         return 1;
 
     if (debug) wprintf(L" Extent: disk=%d start=%llu len=%llu \n\n",
@@ -406,7 +407,7 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
     return 0;
 }
 
-VOID DumpVolumes(PVOLINFO *Mounts, DWORD mnts) {
+VOID DumpVolumes(PVOLINFO* Mounts, DWORD mnts) {
     DWORD n;
     wprintf(L"\nMounts:\n\n");
     for (n = 0; n < mnts; n++) {
@@ -426,23 +427,23 @@ VOID DumpVolumes(PVOLINFO *Mounts, DWORD mnts) {
 
 int wmain(int argc, WCHAR** argv) {
     PVOLINFO Vols;
-    DWORD nvol=0;
+    DWORD nvol = 0;
     BOOL getvols = TRUE;
     int n;
 
     for (n = 1; n < argc; n++) {
-        if(wcscmp(argv[n], L"-d")==0)
-            debug=1;
-        if(wcscmp(argv[n], L"-n")==0)
+        if (wcscmp(argv[n], L"-d") == 0)
+            debug = 1;
+        if (wcscmp(argv[n], L"-n") == 0)
             getvols = FALSE;
     }
 
-    if(getvols)
-        nvol=ListVolumes(&Vols);
-    if(debug) DumpVolumes(&Vols, nvol);
+    if (getvols)
+        nvol = ListVolumes(&Vols);
+    if (debug) DumpVolumes(&Vols, nvol);
 
     wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n"
-    L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
+        L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
     ListDisks(&Vols, nvol);
 
