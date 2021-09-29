@@ -62,8 +62,6 @@ VOID ErrPt(BOOL exit, WCHAR* msg, ...) {
         wprintf(L"[0x%08X] %s\n", err, buff);
     }
 
-    getchar();
-
     if(exit)
         ExitProcess(1);
 }
@@ -72,32 +70,42 @@ VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
     HANDLE hDir;
     OBJECT_ATTRIBUTES attr = { 0 };
     UNICODE_STRING root = { 0 };
-    POBJECT_DIRECTORY_INFORMATION dirinfo;
+    POBJECT_DIRECTORY_INFORMATION DirInfo;
+    DWORD nDirInfo = 1024;
     ULONG i = 0, index = 0, bytes = 0, istart = 0, first = 0;
-    NTSTATUS ret;
+    NTSTATUS status;
 
     RtlInitUnicodeString(&root, L"\\GLOBAL??");
     InitializeObjectAttributes(&attr, &root, 0, NULL, NULL);
 
-    ret = NtOpenDirectoryObject(&hDir, DIRECTORY_QUERY | DIRECTORY_TRAVERSE, &attr);
-    if (ret != 0)
-        return;
+    status = NtOpenDirectoryObject(&hDir, DIRECTORY_QUERY | DIRECTORY_TRAVERSE, &attr);
+    if (status != 0)
+        ErrPt(TRUE, L"NtOpenDirectoryObject NTSTATUS=%08X", status);
 
     if (debug) wprintf(L"Disks:\n");
-    dirinfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJECT_DIRECTORY_INFORMATION) * 1024);
-    if (dirinfo==NULL)
+    DirInfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJECT_DIRECTORY_INFORMATION) * nDirInfo);
+    if (DirInfo==NULL)
         ErrPt(TRUE, L"Unable to allocate memory");
     first = TRUE;
     istart = 0;
     do {
-        ret = NtQueryDirectoryObject(hDir, dirinfo, sizeof(OBJECT_DIRECTORY_INFORMATION) * 1024, FALSE, first, &index, &bytes);
-        if (ret < 0)
+        moremem:
+        status = NtQueryDirectoryObject(hDir, DirInfo, sizeof(OBJECT_DIRECTORY_INFORMATION) * nDirInfo, FALSE, first, &index, &bytes);
+        if (status == 0x00000105) {
+            if (debug) wprintf(L"\nNtQueryDirectoryObject needs more memory n=%d\n", nDirInfo);
+            nDirInfo = nDirInfo * 2;
+            DirInfo = (POBJECT_DIRECTORY_INFORMATION)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, DirInfo, sizeof(OBJECT_DIRECTORY_INFORMATION) * nDirInfo);
+            if (DirInfo == NULL)
+                ErrPt(TRUE, L"Unable to allocate memory for NtQueryDirectoryObject");
+            goto moremem;
+        }
+        if (status < 0)
             break;
 
         for (i = 0; i < index - istart; i++) {
-            if (wcsncmp(dirinfo[i].Name.Buffer, L"PhysicalDrive", wcslen(L"PhysicalDrive")) == 0) {
-                if (debug) wprintf(L"\\\\.\\%s\n", dirinfo[i].Name.Buffer);
-                QueryDisk(dirinfo[i].Name.Buffer, Mounts, mnts);
+            if (wcsncmp(DirInfo[i].Name.Buffer, L"PhysicalDrive", wcslen(L"PhysicalDrive")) == 0) {
+                if (debug) wprintf(L"\\\\.\\%s\n", DirInfo[i].Name.Buffer);
+                QueryDisk(DirInfo[i].Name.Buffer, Mounts, mnts);
             }
         }
 
@@ -106,7 +114,7 @@ VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
     } while (TRUE);
 
     NtClose(hDir);
-    HeapFree(GetProcessHeap(), 0, dirinfo);
+    HeapFree(GetProcessHeap(), 0, DirInfo);
 }
 
 VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
@@ -213,13 +221,13 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     HeapFree(GetProcessHeap(), 0, desc_d);
 
     // Partitions
-    DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
+    DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(DRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
     moremem:
-    status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, DiskLayout, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
+    status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, DiskLayout, sizeof(DRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
     if (status == 0xC0000023) {
         if (debug) wprintf(L"\nIOCTL_DISK_GET_DRIVE_LAYOUT_EX needs more memory n=%d\n", nDiskLayout);
         nDiskLayout = nDiskLayout * 2;
-        DiskLayout = (PDRIVE_LAYOUT_INFORMATION_EX)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, DiskLayout, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
+        DiskLayout = (PDRIVE_LAYOUT_INFORMATION_EX)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, DiskLayout, sizeof(DRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
         if (DiskLayout == NULL)
             ErrPt(TRUE, L"Unable to allocate memory for DiskLayout");
         goto moremem;
@@ -426,6 +434,5 @@ int wmain(int argc, WCHAR** argv) {
     L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
     ListDisks(&Vols, nvol);
-    getchar();
     return 0;
 }
