@@ -5,13 +5,6 @@
 // Copyright (c) 2021 by Google LLC
 //
 
-// TODOs:
-// real error reporting
-// fails on extended partitions
-// trim product id string
-// argv=-n to skip volume probing
-// remove extended debug
-
 #include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
@@ -58,12 +51,18 @@ VOID ErrPt(BOOL exit, WCHAR* msg, ...) {
     WCHAR buff[1024] = { 0 };
     DWORD err;
 
-    va_start(ap, msg); vwprintf(msg, ap); va_end(ap);
+    wprintf(L"Error: ");
+    va_start(ap, msg);
+    vwprintf(msg, ap);
+    va_end(ap);
+    putchar(L'\n');
     err = GetLastError();
     if (err) {
         FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buff, sizeof(buff)/sizeof(WCHAR), NULL);
-        wprintf(L"[0x%08X] %s", err, buff);
+        wprintf(L"[0x%08X] %s\n", err, buff);
     }
+
+    getchar();
 
     if(exit)
         ExitProcess(1);
@@ -115,6 +114,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     GET_LENGTH_INFORMATION  DiskLengthInfo;
     GET_DISK_ATTRIBUTES DiskAttributes;
     PDRIVE_LAYOUT_INFORMATION_EX DiskLayout;
+    WCHAR nDiskLayout=64;
     SCSI_ADDRESS DiskAddress;
     STORAGE_PROPERTY_QUERY desc_q = { StorageDeviceProperty,  PropertyStandardQuery };
     STORAGE_DESCRIPTOR_HEADER desc_h = { 0 };
@@ -213,9 +213,17 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     HeapFree(GetProcessHeap(), 0, desc_d);
 
     // Partitions
-    DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)*128);
-    status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, DiskLayout, sizeof(PDRIVE_LAYOUT_INFORMATION_EX) * 128);
-    // TODO: fails on MBR extended partition
+    DiskLayout = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
+    moremem:
+    status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, DiskLayout, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
+    if (status == 0xC0000023) {
+        if (debug) wprintf(L"\nIOCTL_DISK_GET_DRIVE_LAYOUT_EX needs more memory n=%d\n", nDiskLayout);
+        nDiskLayout = nDiskLayout * 2;
+        DiskLayout = (PDRIVE_LAYOUT_INFORMATION_EX)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, DiskLayout, sizeof(PDRIVE_LAYOUT_INFORMATION_EX)* nDiskLayout);
+        if (DiskLayout == NULL)
+            ErrPt(TRUE, L"Unable to allocate memory for DiskLayout");
+        goto moremem;
+    }
     if (status != 0) {
         NtClose(hDisk);
         HeapFree(GetProcessHeap(), 0, DiskLayout);
@@ -230,7 +238,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
 
         // Mount Points
         for (p = 0; p < mnts; p++) {
-            if (debug) wprintf(L"\n>>> %d: %s==%s %lld==%lld %lld=%lld\n", p, (*Mounts)[p].DiskName, name, (*Mounts)[p].Start, DiskLayout->PartitionEntry[n].StartingOffset.QuadPart, (*Mounts)[p].Length, DiskLayout->PartitionEntry[n].PartitionLength.QuadPart);
+            if (debug>1) wprintf(L"\n  %d: %s==%s %lld==%lld %lld=%lld\n", p, (*Mounts)[p].DiskName, name, (*Mounts)[p].Start, DiskLayout->PartitionEntry[n].StartingOffset.QuadPart, (*Mounts)[p].Length, DiskLayout->PartitionEntry[n].PartitionLength.QuadPart);
             mnt = NULL;
             if (wcscmp((*Mounts)[p].DiskName, name) == 0 &&
                 (*Mounts)[p].Start == DiskLayout->PartitionEntry[n].StartingOffset.QuadPart &&
@@ -418,5 +426,6 @@ int wmain(int argc, WCHAR** argv) {
     L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
     ListDisks(&Vols, nvol);
+    getchar();
     return 0;
 }
