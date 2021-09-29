@@ -23,7 +23,7 @@
 #pragma comment(lib, "ntdll.lib")
 #pragma comment(lib, "shlwapi.lib")
 
-DWORD debug = 0;
+DWORD debug = 1;
 
 #define DIRECTORY_QUERY                 (0x0001)
 #define DIRECTORY_TRAVERSE              (0x0002)
@@ -46,11 +46,28 @@ WCHAR* layout[] = { L"MBR", L"GPT", L"RAW" };
 char* MBRTypes[] = { "Unused", "FAT12", "XENIX root", "XENIX /usr", "FAT16 < 32 MiB", "Extended", "FAT16", "IFS (HPFS/NTFS)", "AIX boot, OS/2, Commodore DOS", "AIX data, Coherent, QNX", "Coherent swap, OPUS, OS/2 Boot Manager", "FAT32", "FAT32 (LBA)", "Unknown", "FAT16 (LBA)", "Extended (LBA)", "OPUS", "Hidden FAT12", "Compaq diagnostics, recovery partition", "Unknown", "Hidden FAT16 < 32 MiB, AST-DOS", "Unknown", "Hidden FAT16", "Hidden IFS (HPFS/NTFS)", "AST-Windows swap", "Willowtech Photon coS", "Unknown", "Hidden FAT32", "Hidden FAT32 (LBA)", "Unknown", "Hidden FAT16 (LBA)", "Unknown", "Willowsoft Overture File System", "Oxygen FSo2", "Oxygen Extended ", "SpeedStor reserved", "NEC-DOS", "Unknown", "SpeedStor reserved", "Hidden NTFS", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "SpeedStor reserved", "Unknown", "SpeedStor reserved", "SpeedStor reserved", "Unknown", "SpeedStor reserved", "Unknown", "Theos", "Plan 9", "Unknown", "Unknown", "Partition Magic", "Hidden NetWare", "Unknown", "Unknown", "VENIX 80286", "PReP Boot", "Secure File System", "PTS-DOS", "Unknown", "Priam, EUMEL/Elan", "EUMEL/Elan", "EUMEL/Elan", "EUMEL/Elan", "Unknown", "ALFS/THIN lightweight filesystem for DOS", "Unknown", "Unknown", "QNX 4", "QNX 4", "QNX 4, Oberon", "Ontrack DM, R/O, FAT", "Ontrack DM, R/W, FAT", "CP/M, Microport UNIX", "Ontrack DM 6", "Ontrack DM 6", "EZ-Drive", "Golden Bow VFeature", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Priam EDISK", "Unknown", "Unknown", "Unknown", "Unknown", "SpeedStor", "Unknown", "GNU Hurd, System V, 386/ix", "NetWare 286", "NetWare", "NetWare 386", "NetWare", "NetWare", "NetWare NSS", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "DiskSecure Multi-Boot", "Unknown", "UNIX 7th Edition", "Unknown", "Unknown", "IBM PC/IX", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Old MINIX", "MINIX, Old Linux", "Linux swap, Solaris", "Linux", "Hidden by OS/2, APM hibernation", "Linux extended", "NT Stripe Set", "NT Stripe Set", "Linux Plaintext", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Linux LVM", "Unknown", "Unknown", "Unknown", "Unknown", "Amoeba, Hidden Linux", "Amoeba bad blocks", "Unknown", "Unknown", "Unknown", "Unknown", "Mylex EISA SCSI", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "BSD/OS", "Hibernation", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "HP Volume Expansion", "FreeBSD", "OpenBSD", "NeXTStep", "Apple UFS", "NetBSD", "Olivetti DOS FAT12", "Apple Boot", "Unknown", "Unknown", "Unknown", "Apple HFS", "BootStar", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "BSDi", "BSDi swap", "Unknown", "Unknown", "PTS BootWizard", "Unknown", "Unknown", "Solaris boot", "Solaris", "Novell DOS, DR-DOS secured", "DR-DOS secured FAT12", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS secured FAT16 < 32 MiB", "Unknown", "DR-DOS secured FAT16", "Syrinx", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS secured FAT32", "DR-DOS secured FAT32 (LBA)", "DR-DOS reserved", "DR-DOS secured FAT16 (LBA)", "DR-DOS secured extended (LBA)", "Multiuser DOS secured FAT12", "Multiuser DOS secured FAT12", "Unknown", "Unknown", "Multiuser DOS secured FAT16 < 32 MiB", "Multiuser DOS secured extended", "Multiuser DOS secured FAT16", "Unknown", "CP/M", "Unknown", "Filesystem-less data", "CP/M, CCP/M, CTOS", "Unknown", "Unknown", "Dell partition", "BootIt EMBRM", "Unknown", "SpeedStor", "DOS read/only", "SpeedStor", "SpeedStor", "Tandy DOS", "SpeedStor", "Unknown", "Unknown", "Unknown", "Unknown", "BeOS", "Unknown", "Spryt*x", "Guid Partition Table", "EFI system partition", "Linux boot", "SpeedStor", "DOS 3.3 secondary, Unisys DOS", "SpeedStor", "SpeedStor", "Prologue", "SpeedStor", "Unknown", "Unknown", "Unknown", "Unknown", "VMWare VMFS", "VMWare VMKCORE", "Linux RAID, FreeDOS", "SpeedStor, LANStep, PS/2 IML", "Xenix bad block" };
 
 
+VOID ErrPt(BOOL, WCHAR*, ...);
 VOID ListDisks(PVOLINFO*, DWORD);
 VOID QueryDisk(WCHAR*, PVOLINFO*, DWORD);
 DWORD ListVolumes(PVOLINFO*);
 NTSTATUS QueryVolume(WCHAR*, PVOLINFO);
 VOID DumpVolumes(PVOLINFO*, DWORD);
+
+VOID ErrPt(BOOL exit, WCHAR* msg, ...) {
+    va_list ap;
+    WCHAR buff[1024] = { 0 };
+    DWORD err;
+
+    va_start(ap, msg); vwprintf(msg, ap); va_end(ap);
+    err = GetLastError();
+    if (err) {
+        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buff, sizeof(buff)/sizeof(WCHAR), NULL);
+        wprintf(L"[0x%08X] %s", err, buff);
+    }
+
+    if(exit)
+        ExitProcess(1);
+}
 
 VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
     HANDLE hDir;
@@ -69,6 +86,8 @@ VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
 
     if (debug) wprintf(L"Disks:\n");
     dirinfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(OBJECT_DIRECTORY_INFORMATION) * 1024);
+    if (dirinfo==NULL)
+        ErrPt(TRUE, L"Unable to allocate memory");
     first = TRUE;
     istart = 0;
     do {
@@ -78,8 +97,7 @@ VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
 
         for (i = 0; i < index - istart; i++) {
             if (wcsncmp(dirinfo[i].Name.Buffer, L"PhysicalDrive", wcslen(L"PhysicalDrive")) == 0) {
-                if (debug)
-                    wprintf(L"\\\\.\\%s\n", dirinfo[i].Name.Buffer);
+                if (debug) wprintf(L"\\\\.\\%s\n", dirinfo[i].Name.Buffer);
                 QueryDisk(dirinfo[i].Name.Buffer, Mounts, mnts);
             }
         }
@@ -120,7 +138,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
 
     status = NtOpenFile(&hDisk, GENERIC_READ | SYNCHRONIZE, &attr, &iosb, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT);
     if (status != 0) {
-        wprintf(L"Error: Unable to open %s, NTSTATUS=0x%08X\n\n", diskname.Buffer, status); // TODO: add real error printing
+        ErrPt(FALSE, L"Error: Unable to open %s, NTSTATUS=0x%08X\n\n", diskname.Buffer, status);
         return;
     }
 
@@ -157,6 +175,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     if (status != 0) {
         NtClose(hDisk);
         wprintf(L"\n");
+        if (debug) ErrPt(FALSE, L"IOCTL_STORAGE_QUERY_PROPERTY NTSTATUS=%08X", status);
         return;
     }
 
@@ -164,6 +183,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     if (desc_d == NULL) {
         NtClose(hDisk);
         wprintf(L"\n");
+        if (debug) ErrPt(FALSE, L"Unable to allocate memory");
         return;
     }
 
@@ -175,7 +195,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     }
     swprintf(buff, sizeof(buff) / sizeof(WCHAR), L"%S %S",
         (desc_d->VendorIdOffset) ? (char*)desc_d + desc_d->VendorIdOffset : "",
-        (desc_d->ProductIdOffset) ? (char*)desc_d + desc_d->ProductIdOffset : "" // TODO: trim product id
+        (desc_d->ProductIdOffset) ? (char*)desc_d + desc_d->ProductIdOffset : ""
     );
     StrTrimW(buff, L" ");
     wprintf(
@@ -200,6 +220,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
         NtClose(hDisk);
         HeapFree(GetProcessHeap(), 0, DiskLayout);
         wprintf(L"\n");
+        if (debug) ErrPt(FALSE, L"IOCTL_DISK_GET_DRIVE_LAYOUT_EX NTSTATUS=%08X", status);
         return;
     }
 
@@ -272,13 +293,13 @@ DWORD ListVolumes(PVOLINFO* Mounts) {
 
     find = FindFirstVolumeW(VolName, sizeof(VolName)/sizeof(WCHAR));
     if (find == INVALID_HANDLE_VALUE) {
-        wprintf(L"Error: Unable to list volumes\n");
+        ErrPt(FALSE, L"Error: Unable to list volumes\n");
         return 0;
     }
 
     *Mounts = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(VOLINFO));
     if (*Mounts == NULL) {
-        wprintf(L"Unable to allocate memory\n");
+        ErrPt(FALSE, L"Unable to allocate memory\n");
         return 0;
     }
 
@@ -293,7 +314,7 @@ DWORD ListVolumes(PVOLINFO* Mounts) {
         n++;
         *Mounts = (PVOLINFO)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *Mounts, n*sizeof(VOLINFO));
         if (*Mounts == NULL) {
-            wprintf(L"Unable to reallocate memory\n");
+            ErrPt(FALSE, L"Unable to reallocate memory\n");
             return n - 1;
         }
     } while (FindNextVolumeW(find, VolName, sizeof(VolName)/sizeof(WCHAR)));
@@ -326,13 +347,13 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
 
     status = NtOpenFile(&hVol, SYNCHRONIZE, &attr, &iosb, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT);
     if (status != 0) {
-        if (debug) wprintf(L"Error: Unable to open %s, NTSTATUS=0x%08X\n\n", volname.Buffer, status);
+        if (debug) ErrPt(FALSE, L"Error: Unable to open %s, NTSTATUS=0x%08X\n\n", volname.Buffer, status);
         return 1;
     }
 
     status = NtDeviceIoControlFile(hVol, NULL, NULL, NULL, &iosb, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, NULL, 0, &volext, sizeof(volext));
     if (status != 0) {
-        if (debug) wprintf(L" Error: Unable to get volume extents, NTSTATUS=0x%08X\n\n", status);
+        if (debug) ErrPt(FALSE, L" Error: Unable to get volume extents, NTSTATUS=0x%08X\n\n", status);
         NtClose(hVol);
         return 1;
     }
@@ -388,6 +409,7 @@ VOID DumpVolumes(PVOLINFO *Mounts, DWORD mnts) {
 int wmain(int argc, WCHAR** argv) {
     PVOLINFO Vols;
     DWORD nvol=0;
+
     // TODO: only do this if argv != -n
     nvol=ListVolumes(&Vols);
     if(debug) DumpVolumes(&Vols, nvol);
