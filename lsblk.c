@@ -103,7 +103,7 @@ VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
             break;
 
         for (i = 0; i < index - istart; i++) {
-            if (wcsncmp(DirInfo[i].Name.Buffer, L"PhysicalDrive", wcslen(L"PhysicalDrive")) == 0) {
+            if (wcsncmp(DirInfo[i].Name.Buffer, L"PhysicalDrive", 13) == 0) {
                 if (debug) wprintf(L"\\\\.\\%s\n", DirInfo[i].Name.Buffer);
                 QueryDisk(DirInfo[i].Name.Buffer, Mounts, mnts);
             }
@@ -446,6 +446,5 @@ int wmain(int argc, WCHAR** argv) {
         L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
 
     ListDisks(&Vols, nvol);
-
     return 0;
 }
