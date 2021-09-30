@@ -10,11 +10,11 @@ PhysicalDrive0  0:1:0:0  3577G 1  1  0  1  0  SATA  SAMSUNG M2345-005
  L Partition 1              0G                GPT   LDM metadata partition 
  L Partition 2              0G                GPT   Microsoft reserved partition 
  L Partition 3           3577G                GPT   NTFS D:\ C:\mnt 
-PhysicalDrive1  2:0:0:0   477G 1  1  0  1  0  NVME  NVMe     Samsung SSD 950  
+PhysicalDrive1  2:0:0:0  1863G 1  1  0  1  0  NVME  Samsung SSD 970 EVO Plus 2TB  
  L Partition 1              0G                GPT   Basic data partition [Required] 
  L Partition 2              0G                GPT   EFI system partition 
  L Partition 3              0G                GPT   Microsoft reserved partition 
- L Partition 4            476G                GPT   NTFS C:\ 
+ L Partition 4           1862G                GPT   NTFS C:\ 
 PhysicalDrive2  0:0:0:0     7G 1  0  1  1  1  USB   Generic- SD/MMC           
  L Partition 1              7G                MBR   FAT32  
 PhysicalDrive3  0:0:0:1        1  0  1  0  0  USB   Generic- Compact Flash    
