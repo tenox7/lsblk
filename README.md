@@ -1,6 +1,6 @@
 # lsblk for windows
 
-A utility similar to Linux *lsblk(1)* for Windows. This is not a port of the Linux lsblk source code but rather a completely new utility with just a similar output.
+Utility similar to Linux *lsblk(1)* for Windows. This is not a port of the Linux lsblk source code but rather a completely new utility with just a similar output.
 
 The latest version supports printing drive letters, mount points and filesystem types.
 
