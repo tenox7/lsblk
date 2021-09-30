@@ -2,7 +2,7 @@
 
 A utility similar to Linux *lsblk(1)* for Windows. This is not a port of the Linux lsblk source code but rather a completely new utility with just a similar output.
 
-The latest version supports drive letter, mount points and filesystem types.
+The latest version supports printing drive letters, mount points and filesystem types.
 
 ```
 NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION
