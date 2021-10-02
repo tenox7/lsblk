@@ -58,7 +58,7 @@ VOID ErrPt(BOOL exit, WCHAR* msg, ...) {
     putchar(L'\n');
     err = GetLastError();
     if (err) {
-        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buff, sizeof(buff) / sizeof(WCHAR), NULL);
+        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK, NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buff, ARRAYSIZE(buff), NULL);
         wprintf(L"[0x%08X] %s\n", err, buff);
     }
 
@@ -138,7 +138,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     NTSTATUS status;
     int i, n, p;
 
-    swprintf(buff, sizeof(buff) / sizeof(WCHAR), L"\\??\\%s", name);
+    swprintf(buff, ARRAYSIZE(buff), L"\\??\\%s", name);
     RtlInitUnicodeString(&diskname, buff);
     InitializeObjectAttributes(&attr, &diskname, 0, NULL, NULL);
 
@@ -215,7 +215,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
         desc_d->RemovableMedia,
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_CHECK_VERIFY2, NULL, 0, NULL, 0) == 0) ? 1 : 0,
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_IS_WRITABLE, NULL, 0, NULL, 0) < 0) ? 1 : 0,
-        (desc_d->BusType <= (sizeof(bus) / sizeof(bus[0]) - 1)) ? bus[desc_d->BusType] : bus[0],
+        (desc_d->BusType < ARRAYSIZE(bus)) ? bus[desc_d->BusType] : bus[0],
         buff
     );
     HeapFree(GetProcessHeap(), 0, desc_d);
@@ -307,7 +307,7 @@ DWORD ListVolumes(PVOLINFO* Mounts) {
     HANDLE find;
     DWORD n = 1;
 
-    find = FindFirstVolumeW(VolName, sizeof(VolName) / sizeof(WCHAR));
+    find = FindFirstVolumeW(VolName, ARRAYSIZE(VolName));
     if (find == INVALID_HANDLE_VALUE) {
         ErrPt(FALSE, L"Unable to list volumes\n");
         return 0;
@@ -333,7 +333,7 @@ DWORD ListVolumes(PVOLINFO* Mounts) {
             ErrPt(FALSE, L"Unable to reallocate memory\n");
             return n - 1;
         }
-    } while (FindNextVolumeW(find, VolName, sizeof(VolName) / sizeof(WCHAR)));
+    } while (FindNextVolumeW(find, VolName, ARRAYSIZE(VolName)));
 
     return n - 1;
 }
@@ -352,10 +352,10 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
     if (debug) (L"\n* %s\n", name);
 
     // Filesystem Type
-    GetVolumeInformationW(name, NULL, 0, NULL, NULL, NULL, Mounts->FsType, sizeof(Mounts->FsType) / sizeof(WCHAR));
+    GetVolumeInformationW(name, NULL, 0, NULL, NULL, NULL, Mounts->FsType, ARRAYSIZE(Mounts->FsType));
 
     // Extents
-    swprintf(buff, sizeof(buff) / sizeof(WCHAR), L"\\GLOBAL??%s", name + 3);
+    swprintf(buff, ARRAYSIZE(buff), L"\\GLOBAL??%s", name + 3);
     buff[wcslen(buff) - 1] = L'\0';
     if (debug) wprintf(L" %s\n", buff);
     RtlInitUnicodeString(&volname, buff);
@@ -385,12 +385,12 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
         volext.Extents[0].ExtentLength.QuadPart
     );
 
-    swprintf(Mounts->DiskName, sizeof(Mounts->DiskName) / sizeof(WCHAR), L"PhysicalDrive%d", volext.Extents[0].DiskNumber);
+    swprintf(Mounts->DiskName, ARRAYSIZE(Mounts->DiskName), L"PhysicalDrive%d", volext.Extents[0].DiskNumber);
     Mounts->Start = volext.Extents[0].StartingOffset.QuadPart;
     Mounts->Length = volext.Extents[0].ExtentLength.QuadPart;
 
     // Mount points
-    if (!GetVolumePathNamesForVolumeNameW(name, buff, sizeof(buff) / sizeof(WCHAR), &len))
+    if (!GetVolumePathNamesForVolumeNameW(name, buff, ARRAYSIZE(buff), &len))
         return 0;
 
     if (len < 2)
@@ -400,7 +400,7 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
 
     for (next = buff; next[0] != L'\0'; next += wcslen(next) + 1) {
         if (debug) wprintf(L" - %s ", next);
-        swprintf(Mounts->MntPaths, sizeof(Mounts->MntPaths) / sizeof(WCHAR), L"%s%s ", Mounts->MntPaths, next);
+        swprintf(Mounts->MntPaths, ARRAYSIZE(Mounts->MntPaths), L"%s%s ", Mounts->MntPaths, next);
     }
     if (debug) wprintf(L"\n");
 
