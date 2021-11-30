@@ -16,7 +16,6 @@ Explanation of header columns:
 ST - Status (1=healthy, 0=unhealthy)
 TR - Trim/Unmap/Discard capability support
 RM - Removable media (1=yes, 0=no)
-MD - Media changed (for removable media)
 RO - Read only (1=yes, 0=no)
 ```
 
