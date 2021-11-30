@@ -151,6 +151,7 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     RtlInitUnicodeString(&diskname, buff);
     InitializeObjectAttributes(&attr, &diskname, 0, NULL, NULL);
 
+    // NAME
     wprintf(L"%-15s", name);
 
     status = NtOpenFile(&hDisk, GENERIC_READ | SYNCHRONIZE, &attr, &iosb, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT);
@@ -159,35 +160,35 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
         return;
     }
 
-    // SCSI Address
+    // HCTL
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_SCSI_GET_ADDRESS, NULL, 0, &DiskAddress, sizeof(DiskAddress));
     if (status == 0)
         wprintf(L" %d:%d:%d:%d ", DiskAddress.PortNumber, DiskAddress.PathId, DiskAddress.TargetId, DiskAddress.Lun);
     else
         wprintf(L" -:-:-: -");
 
-    // Size
+    // SIZE
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_LENGTH_INFO, NULL, 0, &DiskLengthInfo, sizeof(DiskLengthInfo));
     if (status == 0)
         SizePt((float)DiskLengthInfo.Length.QuadPart);
     else
         wprintf(L"      ");
 
-    // Status
+    // ST
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DISK_ATTRIBUTES, NULL, 0, &DiskAttributes, sizeof(DiskAttributes));
     if (status == 0)
         wprintf(L" %d ", (DiskAttributes.Attributes) ? 0 : 1);
     else
         wprintf(L"   ");
 
-    // Trim
+    // TR
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_QUERY_PROPERTY, &trim_q, sizeof(trim_q), &trim_d, sizeof(trim_d));
     if (status == 0)
         wprintf(L" %d ", (trim_d.Version == sizeof(DEVICE_TRIM_DESCRIPTOR) && trim_d.TrimEnabled == 1) ? 1 : 0);
     else
         wprintf(L" 0 ");
 
-    // Device Property
+    // RM RO TYPE DESCRIPTION
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_QUERY_PROPERTY, &desc_q, sizeof(desc_q), &desc_h, sizeof(desc_h));
     if (status != 0) {
         NtClose(hDisk);
@@ -218,11 +219,9 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     wprintf(
         L" %d "
         L" %d "
-        L" %d "
         L" %-5s "
         L"%s\n",
         desc_d->RemovableMedia,
-        (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_STORAGE_CHECK_VERIFY2, NULL, 0, NULL, 0) == 0) ? 1 : 0,
         (NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_IS_WRITABLE, NULL, 0, NULL, 0) < 0) ? 1 : 0,
         (desc_d->BusType < ARRAYSIZE(bus)) ? bus[desc_d->BusType] : bus[0],
         buff
@@ -450,7 +449,7 @@ int wmain(int argc, WCHAR** argv) {
     if (debug) DumpVolumes(&Vols, nvol);
 
     wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n"
-        L"NAME            HCTL      SIZE ST TR RM MD RO TYPE  DESCRIPTION\n");
+        L"NAME            HCTL      SIZE ST TR RM RO TYPE  DESCRIPTION\n");
 
     ListDisks(&Vols, nvol);
     return 0;
