@@ -448,7 +448,7 @@ int wmain(int argc, WCHAR** argv) {
         nvol = ListVolumes(&Vols);
     if (debug) DumpVolumes(&Vols, nvol);
 
-    wprintf(L"lsblk for Windows, v2.0, Copyright (c) 2021 Google LLC\n\n"
+    wprintf(L"lsblk for Windows, v1.1, Copyright (c) 2021 Google LLC\n\n"
         L"NAME            HCTL      SIZE ST TR RM RO TYPE  DESCRIPTION\n");
 
     ListDisks(&Vols, nvol);
