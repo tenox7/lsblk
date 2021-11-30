@@ -269,7 +269,7 @@ moremem:
 
         wprintf(L" L Partition %d          ",  DiskLayout->PartitionEntry[n].PartitionNumber);
         SizePt((float)DiskLayout->PartitionEntry[n].PartitionLength.QuadPart);
-        wprintf(L"      %-4s  ", layout[DiskLayout->PartitionEntry[n].PartitionStyle]);
+        wprintf(L"             %-4s  ", layout[DiskLayout->PartitionEntry[n].PartitionStyle]);
 
         if (fst && wcslen(fst))
             wprintf(L"%s ", fst);
