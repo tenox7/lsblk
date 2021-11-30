@@ -17,6 +17,8 @@
 #pragma comment(lib, "shlwapi.lib")
 
 DWORD debug = 0;
+float MB = 1 << 20;
+float GB = 1 << 30;
 
 #define DIRECTORY_QUERY                 (0x0001)
 #define DIRECTORY_TRAVERSE              (0x0002)
@@ -64,6 +66,13 @@ VOID ErrPt(BOOL exit, WCHAR* msg, ...) {
 
     if (exit)
         ExitProcess(1);
+}
+
+VOID SizePt(float size) {
+    if (size < GB)
+        wprintf(L"%5.0fM", size / MB);
+    else
+        wprintf(L"%5.0fG", size / GB);
 }
 
 VOID ListDisks(PVOLINFO* Mounts, DWORD mnts) {
@@ -153,16 +162,16 @@ VOID QueryDisk(WCHAR* name, PVOLINFO* Mounts, DWORD mnts) {
     // SCSI Address
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_SCSI_GET_ADDRESS, NULL, 0, &DiskAddress, sizeof(DiskAddress));
     if (status == 0)
-        wprintf(L" %d:%d:%d:%d", DiskAddress.PortNumber, DiskAddress.PathId, DiskAddress.TargetId, DiskAddress.Lun);
+        wprintf(L" %d:%d:%d:%d ", DiskAddress.PortNumber, DiskAddress.PathId, DiskAddress.TargetId, DiskAddress.Lun);
     else
-        wprintf(L" -:-:-:-");
+        wprintf(L" -:-:-: -");
 
     // Size
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_LENGTH_INFO, NULL, 0, &DiskLengthInfo, sizeof(DiskLengthInfo));
     if (status == 0)
-        wprintf(L" %5.0fG", (float)DiskLengthInfo.Length.QuadPart / 1024.0 / 1024.0 / 1024.0);
+        SizePt((float)DiskLengthInfo.Length.QuadPart);
     else
-        wprintf(L"       ");
+        wprintf(L"      ");
 
     // Status
     status = NtDeviceIoControlFile(hDisk, NULL, NULL, NULL, &iosb, IOCTL_DISK_GET_DISK_ATTRIBUTES, NULL, 0, &DiskAttributes, sizeof(DiskAttributes));
@@ -259,11 +268,9 @@ moremem:
             }
         }
 
-        wprintf(L" L Partition %d          %5.0fG                %-4s  ",
-            DiskLayout->PartitionEntry[n].PartitionNumber,
-            (float)DiskLayout->PartitionEntry[n].PartitionLength.QuadPart / 1024 / 1024 / 1024,
-            layout[DiskLayout->PartitionEntry[n].PartitionStyle]
-        );
+        wprintf(L" L Partition %d          ",  DiskLayout->PartitionEntry[n].PartitionNumber);
+        SizePt((float)DiskLayout->PartitionEntry[n].PartitionLength.QuadPart);
+        wprintf(L"      %-4s  ", layout[DiskLayout->PartitionEntry[n].PartitionStyle]);
 
         if (fst && wcslen(fst))
             wprintf(L"%s ", fst);
@@ -349,7 +356,7 @@ NTSTATUS QueryVolume(WCHAR* name, PVOLINFO Mounts) {
     HANDLE hVol;
     VOLUME_DISK_EXTENTS volext;
 
-    if (debug) (L"\n* %s\n", name);
+    if (debug) wprintf(L"\n* %s\n", name);
 
     // Filesystem Type
     GetVolumeInformationW(name, NULL, 0, NULL, NULL, NULL, Mounts->FsType, ARRAYSIZE(Mounts->FsType));
