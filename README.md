@@ -8,8 +8,6 @@ The latest version supports printing drive letters, mount points and filesystem 
 
 Download under [releases](https://github.com/tenox7/lsblk/releases)
 
-For a similar more native Windows utility see [listdisk](https://github.com/tenox7/listdisk)
-
 Explanation of header columns:
 
 ```
