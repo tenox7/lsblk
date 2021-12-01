@@ -5,13 +5,16 @@
 // Copyright (c) 2021 by Google LLC
 //
 
+#define VERSION L"1.2"
+
 #include <windows.h>
 #include <wchar.h>
 #include <stdio.h>
-#include <initguid.h>
 #include <winternl.h>
-#include <Ntddscsi.h>
+#include <ntddscsi.h>
 #include <ntdddisk.h>
+#include <initguid.h>
+#include <diskguid.h>
 
 #pragma comment(lib, "ntdll.lib")
 #pragma comment(lib, "shlwapi.lib")
@@ -19,6 +22,10 @@
 DWORD debug = 0;
 float MB = 1 << 20;
 float GB = 1 << 30;
+WCHAR* ft[] = { L"False", L"True" };
+WCHAR* bus[] = { L"UNKNOWN", L"SCSI", L"ATAPI", L"ATA", L"1394", L"SSA", L"FC", L"USB", L"RAID", L"ISCSI", L"SAS", L"SATA", L"SD", L"MMC", L"VIRTUAL", L"VHD", L"MAX", L"NVME" };
+WCHAR* layout[] = { L"MBR", L"GPT", L"RAW" };
+char* MBRTypes[] = { "Unused", "FAT12", "XENIX root", "XENIX /usr", "FAT16 < 32 MiB", "Extended", "FAT16", "IFS", "AIX boot, OS/2, Commodore DOS", "AIX data, Coherent, QNX", "Coherent swap, OPUS, OS/2 Boot Manager", "FAT32", "FAT32 (LBA)", "Unknown", "FAT16 (LBA)", "Extended (LBA)", "OPUS", "Hidden FAT12", "Compaq diagnostics, recovery partition", "Unknown", "Hidden FAT16 < 32 MiB, AST-DOS", "Unknown", "Hidden FAT16", "Hidden IFS (HPFS/NTFS)", "AST-Windows swap", "Willowtech Photon coS", "Unknown", "Hidden FAT32", "Hidden FAT32 (LBA)", "Unknown", "Hidden FAT16 (LBA)", "Unknown", "Willowsoft Overture File System", "Oxygen FSo2", "Oxygen Extended ", "SpeedStor reserved", "NEC-DOS", "Unknown", "SpeedStor reserved", "Hidden NTFS", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "SpeedStor reserved", "Unknown", "SpeedStor reserved", "SpeedStor reserved", "Unknown", "SpeedStor reserved", "Unknown", "Theos", "Plan 9", "Unknown", "Unknown", "Partition Magic", "Hidden NetWare", "Unknown", "Unknown", "VENIX 80286", "PReP Boot", "Secure File System", "PTS-DOS", "Unknown", "Priam, EUMEL/Elan", "EUMEL/Elan", "EUMEL/Elan", "EUMEL/Elan", "Unknown", "ALFS/THIN lightweight filesystem for DOS", "Unknown", "Unknown", "QNX 4", "QNX 4", "QNX 4, Oberon", "Ontrack DM, R/O, FAT", "Ontrack DM, R/W, FAT", "CP/M, Microport UNIX", "Ontrack DM 6", "Ontrack DM 6", "EZ-Drive", "Golden Bow VFeature", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Priam EDISK", "Unknown", "Unknown", "Unknown", "Unknown", "SpeedStor", "Unknown", "GNU Hurd, System V, 386/ix", "NetWare 286", "NetWare", "NetWare 386", "NetWare", "NetWare", "NetWare NSS", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "DiskSecure Multi-Boot", "Unknown", "UNIX 7th Edition", "Unknown", "Unknown", "IBM PC/IX", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Old MINIX", "MINIX, Old Linux", "Linux swap, Solaris", "Linux", "Hidden by OS/2, APM hibernation", "Linux extended", "NT Stripe Set", "NT Stripe Set", "Linux Plaintext", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Linux LVM", "Unknown", "Unknown", "Unknown", "Unknown", "Amoeba, Hidden Linux", "Amoeba bad blocks", "Unknown", "Unknown", "Unknown", "Unknown", "Mylex EISA SCSI", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "BSD/OS", "Hibernation", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "HP Volume Expansion", "FreeBSD", "OpenBSD", "NeXTStep", "Apple UFS", "NetBSD", "Olivetti DOS FAT12", "Apple Boot", "Unknown", "Unknown", "Unknown", "Apple HFS", "BootStar", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "BSDi", "BSDi swap", "Unknown", "Unknown", "PTS BootWizard", "Unknown", "Unknown", "Solaris boot", "Solaris", "Novell DOS, DR-DOS secured", "DR-DOS secured FAT12", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS secured FAT16 < 32 MiB", "Unknown", "DR-DOS secured FAT16", "Syrinx", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS secured FAT32", "DR-DOS secured FAT32 (LBA)", "DR-DOS reserved", "DR-DOS secured FAT16 (LBA)", "DR-DOS secured extended (LBA)", "Multiuser DOS secured FAT12", "Multiuser DOS secured FAT12", "Unknown", "Unknown", "Multiuser DOS secured FAT16 < 32 MiB", "Multiuser DOS secured extended", "Multiuser DOS secured FAT16", "Unknown", "CP/M", "Unknown", "Filesystem-less data", "CP/M, CCP/M, CTOS", "Unknown", "Unknown", "Dell partition", "BootIt EMBRM", "Unknown", "SpeedStor", "DOS read/only", "SpeedStor", "SpeedStor", "Tandy DOS", "SpeedStor", "Unknown", "Unknown", "Unknown", "Unknown", "BeOS", "Unknown", "Spryt*x", "Guid Partition Table", "EFI system partition", "Linux boot", "SpeedStor", "DOS 3.3 secondary, Unisys DOS", "SpeedStor", "SpeedStor", "Prologue", "SpeedStor", "Unknown", "Unknown", "Unknown", "Unknown", "VMWare VMFS", "VMWare VMKCORE", "Linux RAID, FreeDOS", "SpeedStor, LANStep, PS/2 IML", "Xenix bad block" };
 
 #define DIRECTORY_QUERY                 (0x0001)
 #define DIRECTORY_TRAVERSE              (0x0002)
@@ -35,11 +42,8 @@ typedef struct _VOLINFO {
     WCHAR    FsType[MAX_PATH + 1];
 } VOLINFO, * PVOLINFO;
 
-WCHAR* ft[] = { L"False", L"True" };
-WCHAR* bus[] = { L"UNKNOWN", L"SCSI", L"ATAPI", L"ATA", L"1394", L"SSA", L"FC", L"USB", L"RAID", L"ISCSI", L"SAS", L"SATA", L"SD", L"MMC", L"VIRTUAL", L"VHD", L"MAX", L"NVME" };
-WCHAR* layout[] = { L"MBR", L"GPT", L"RAW" };
-char* MBRTypes[] = { "Unused", "FAT12", "XENIX root", "XENIX /usr", "FAT16 < 32 MiB", "Extended", "FAT16", "IFS (HPFS/NTFS)", "AIX boot, OS/2, Commodore DOS", "AIX data, Coherent, QNX", "Coherent swap, OPUS, OS/2 Boot Manager", "FAT32", "FAT32 (LBA)", "Unknown", "FAT16 (LBA)", "Extended (LBA)", "OPUS", "Hidden FAT12", "Compaq diagnostics, recovery partition", "Unknown", "Hidden FAT16 < 32 MiB, AST-DOS", "Unknown", "Hidden FAT16", "Hidden IFS (HPFS/NTFS)", "AST-Windows swap", "Willowtech Photon coS", "Unknown", "Hidden FAT32", "Hidden FAT32 (LBA)", "Unknown", "Hidden FAT16 (LBA)", "Unknown", "Willowsoft Overture File System", "Oxygen FSo2", "Oxygen Extended ", "SpeedStor reserved", "NEC-DOS", "Unknown", "SpeedStor reserved", "Hidden NTFS", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "SpeedStor reserved", "Unknown", "SpeedStor reserved", "SpeedStor reserved", "Unknown", "SpeedStor reserved", "Unknown", "Theos", "Plan 9", "Unknown", "Unknown", "Partition Magic", "Hidden NetWare", "Unknown", "Unknown", "VENIX 80286", "PReP Boot", "Secure File System", "PTS-DOS", "Unknown", "Priam, EUMEL/Elan", "EUMEL/Elan", "EUMEL/Elan", "EUMEL/Elan", "Unknown", "ALFS/THIN lightweight filesystem for DOS", "Unknown", "Unknown", "QNX 4", "QNX 4", "QNX 4, Oberon", "Ontrack DM, R/O, FAT", "Ontrack DM, R/W, FAT", "CP/M, Microport UNIX", "Ontrack DM 6", "Ontrack DM 6", "EZ-Drive", "Golden Bow VFeature", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Priam EDISK", "Unknown", "Unknown", "Unknown", "Unknown", "SpeedStor", "Unknown", "GNU Hurd, System V, 386/ix", "NetWare 286", "NetWare", "NetWare 386", "NetWare", "NetWare", "NetWare NSS", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "DiskSecure Multi-Boot", "Unknown", "UNIX 7th Edition", "Unknown", "Unknown", "IBM PC/IX", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Old MINIX", "MINIX, Old Linux", "Linux swap, Solaris", "Linux", "Hidden by OS/2, APM hibernation", "Linux extended", "NT Stripe Set", "NT Stripe Set", "Linux Plaintext", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Linux LVM", "Unknown", "Unknown", "Unknown", "Unknown", "Amoeba, Hidden Linux", "Amoeba bad blocks", "Unknown", "Unknown", "Unknown", "Unknown", "Mylex EISA SCSI", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "BSD/OS", "Hibernation", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "HP Volume Expansion", "FreeBSD", "OpenBSD", "NeXTStep", "Apple UFS", "NetBSD", "Olivetti DOS FAT12", "Apple Boot", "Unknown", "Unknown", "Unknown", "Apple HFS", "BootStar", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "HP Volume Expansion", "Unknown", "HP Volume Expansion", "BSDi", "BSDi swap", "Unknown", "Unknown", "PTS BootWizard", "Unknown", "Unknown", "Solaris boot", "Solaris", "Novell DOS, DR-DOS secured", "DR-DOS secured FAT12", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS secured FAT16 < 32 MiB", "Unknown", "DR-DOS secured FAT16", "Syrinx", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS reserved", "DR-DOS secured FAT32", "DR-DOS secured FAT32 (LBA)", "DR-DOS reserved", "DR-DOS secured FAT16 (LBA)", "DR-DOS secured extended (LBA)", "Multiuser DOS secured FAT12", "Multiuser DOS secured FAT12", "Unknown", "Unknown", "Multiuser DOS secured FAT16 < 32 MiB", "Multiuser DOS secured extended", "Multiuser DOS secured FAT16", "Unknown", "CP/M", "Unknown", "Filesystem-less data", "CP/M, CCP/M, CTOS", "Unknown", "Unknown", "Dell partition", "BootIt EMBRM", "Unknown", "SpeedStor", "DOS read/only", "SpeedStor", "SpeedStor", "Tandy DOS", "SpeedStor", "Unknown", "Unknown", "Unknown", "Unknown", "BeOS", "Unknown", "Spryt*x", "Guid Partition Table", "EFI system partition", "Linux boot", "SpeedStor", "DOS 3.3 secondary, Unisys DOS", "SpeedStor", "SpeedStor", "Prologue", "SpeedStor", "Unknown", "Unknown", "Unknown", "Unknown", "VMWare VMFS", "VMWare VMKCORE", "Linux RAID, FreeDOS", "SpeedStor, LANStep, PS/2 IML", "Xenix bad block" };
-
+#define GUID_FORMAT L" {%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX} "
+#define GUID_ARG(guid) (guid).Data1, (guid).Data2, (guid).Data3, (guid).Data4[0], (guid).Data4[1], (guid).Data4[2], (guid).Data4[3], (guid).Data4[4], (guid).Data4[5], (guid).Data4[6], (guid).Data4[7]
 
 VOID ErrPt(BOOL, WCHAR*, ...);
 VOID ListDisks(PVOLINFO*, DWORD);
@@ -271,35 +275,60 @@ moremem:
         SizePt((float)DiskLayout->PartitionEntry[n].PartitionLength.QuadPart);
         wprintf(L"             %-4s  ", layout[DiskLayout->PartitionEntry[n].PartitionStyle]);
 
-        if (fst && wcslen(fst))
-            wprintf(L"%s ", fst);
 
         if (DiskLayout->PartitionEntry[n].PartitionStyle == PARTITION_STYLE_MBR) {
-            if (mnt != NULL && wcslen(mnt) > 2)
-                wprintf(L"%s", mnt);
-            else
-                wprintf(L"%S ", MBRTypes[DiskLayout->PartitionEntry[n].Mbr.PartitionType]);
+            wprintf(L"%s %s %S", 
+                IsContainerPartition(DiskLayout->PartitionEntry[n].Mbr.PartitionType&PARTITION_EXTENDED) ? L"Primary" : L"Extended",
+                (DiskLayout->PartitionEntry[n].Mbr.BootIndicator) ? L"(Active)" : L"",
+                MBRTypes[DiskLayout->PartitionEntry[n].Mbr.PartitionType]
+            );
 
-            wprintf(L"%s", (DiskLayout->PartitionEntry[n].Mbr.BootIndicator) ? L" [Active]" : L" ");
+            if (fst)
+                wprintf(L" %s", fst);
+
+            if (mnt)
+                wprintf(L" %s", mnt);
         }
         else if (DiskLayout->PartitionEntry[n].PartitionStyle == PARTITION_STYLE_GPT) {
-            if (mnt != NULL && wcslen(mnt) > 2)
-                wprintf(L"%s", mnt);
-            else
-                wprintf(L"%s ", DiskLayout->PartitionEntry[n].Gpt.Name);
+            wprintf(L"%s", DiskLayout->PartitionEntry[n].Gpt.Name);
+            
+            //if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_BASIC_DATA_GUID)) wprintf(L" [Basic Data]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_BSP_GUID)) wprintf(L" [BSP]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_CLUSTER_GUID)) wprintf(L" [Cluster]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_DPP_GUID)) wprintf(L" [DPP]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_LDM_DATA_GUID)) wprintf(L" [LDM Data]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_LDM_METADATA_GUID)) wprintf(L" [LDM Meta]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_LEGACY_BL_GUID)) wprintf(L" [Legacy Boot]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_LEGACY_BL_GUID_BACKUP)) wprintf(L" [Legacy Boot Backup]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_MAIN_OS_GUID)) wprintf(L" [OS Main]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_MSFT_RECOVERY_GUID)) wprintf(L" [Recovery]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_MSFT_RESERVED_GUID)) wprintf(L" [Reserved]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_MSFT_SNAPSHOT_GUID)) wprintf(L" [Snapshot]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_OS_DATA_GUID)) wprintf(L" [OS Data]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_PATCH_GUID)) wprintf(L" [Patch]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_PRE_INSTALLED_GUID)) wprintf(L" [Preinstall]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_SPACES_GUID)) wprintf(L" [Spaces]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_SPACES_DATA_GUID)) wprintf(L" [Spaces Data]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_SYSTEM_GUID)) wprintf(L" [System]");
+            if (IsEqualPartitionType(DiskLayout->PartitionEntry[n].Gpt.PartitionType, PARTITION_WINDOWS_SYSTEM_GUID)) wprintf(L" [Windows System]");
+            
+            if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_ATTRIBUTE_PLATFORM_REQUIRED) == GPT_ATTRIBUTE_PLATFORM_REQUIRED)  wprintf(L" [Required]");
+            if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_BASIC_DATA_ATTRIBUTE_HIDDEN) == GPT_BASIC_DATA_ATTRIBUTE_HIDDEN)  wprintf(L" [Hidden]");
+            if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_BASIC_DATA_ATTRIBUTE_SHADOW_COPY) == GPT_BASIC_DATA_ATTRIBUTE_SHADOW_COPY) wprintf(L" [Shadow_Copy]");
+            if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_BASIC_DATA_ATTRIBUTE_READ_ONLY) == GPT_BASIC_DATA_ATTRIBUTE_READ_ONLY) wprintf(L" [Readonly]");
+            
+            if(debug) wprintf(GUID_FORMAT, GUID_ARG(DiskLayout->PartitionEntry[n].Gpt.PartitionType));
+            
+            if (fst)
+                wprintf(L" %s", fst);
 
-            if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_ATTRIBUTE_PLATFORM_REQUIRED) == GPT_ATTRIBUTE_PLATFORM_REQUIRED)
-                wprintf(L"[Required] ");
-            if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_BASIC_DATA_ATTRIBUTE_HIDDEN) == GPT_BASIC_DATA_ATTRIBUTE_HIDDEN)
-                wprintf(L"[Hidden] ");
-            if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_BASIC_DATA_ATTRIBUTE_SHADOW_COPY) == GPT_BASIC_DATA_ATTRIBUTE_SHADOW_COPY)
-                wprintf(L"[Shadow_Copy] ");
-            if ((DiskLayout->PartitionEntry[n].Gpt.Attributes & GPT_BASIC_DATA_ATTRIBUTE_READ_ONLY) == GPT_BASIC_DATA_ATTRIBUTE_READ_ONLY)
-                wprintf(L"[Readonly] ");
+            if (mnt)
+                wprintf(L" %s", mnt);
         }
         else {
             wprintf(L"RAW");
         }
+
 
         wprintf(L"\n");
     }
@@ -448,8 +477,8 @@ int wmain(int argc, WCHAR** argv) {
         nvol = ListVolumes(&Vols);
     if (debug) DumpVolumes(&Vols, nvol);
 
-    wprintf(L"lsblk for Windows, v1.1, Copyright (c) 2021 Google LLC\n\n"
-        L"NAME            HCTL      SIZE ST TR RM RO TYPE  DESCRIPTION\n");
+    wprintf(L"lsblk for Windows v%s, Copyright (c) 2021 Google LLC\n\n"
+        L"NAME            HCTL      SIZE ST TR RM RO TYPE  DESCRIPTION\n", VERSION);
 
     ListDisks(&Vols, nvol);
     return 0;
